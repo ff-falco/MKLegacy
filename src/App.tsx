@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LandingPage from "./LandingPage";
 import TierListPage from "./TierListPage";
+import TournamentPage from "./TournamentPage";
 
 
 function App() {
@@ -9,6 +10,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/tierlist" element={<TierListPage />} />
+        <Route path="/tournament" element={<TournamentPage />} />
       </Routes>
     </BrowserRouter>
   );

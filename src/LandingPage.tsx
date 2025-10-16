@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+
 //import { useNavigate } from "react-router-dom";
 
 
@@ -35,6 +37,7 @@ export default function LandingPage() {
     setTournamentCode("");
     setTierCode("");
   };
+  const navigate = useNavigate();
 
   // Tooltip mobile + click con durata estesa
   useEffect(() => {
@@ -200,16 +203,30 @@ export default function LandingPage() {
 
                 {/* Bottoni OK / Cancella */}
                 <div className="flex justify-between gap-4">
-                  <Button
-                    variant="default"
-                    onClick={() => {
-                      alert(`Torneo creato:\nNome: ${formData.name}\nGiocatori: ${formData.players}\nPostazioni: ${formData.stations}\nData: ${formData.date}\nCodice Tier List: ${tierCode}`);
-                      closeModal();
-                    }}
-                    className="flex-1"
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    const tournamentData = {
+                      name: formData.name,
+                      players: formData.players,
+                      stations: formData.stations,
+                      date: formData.date,
+                      tierCode: tierCode,
+                    };
+                    
+                    // Genera un codice univoco
+                    const tournamentId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+                    // Salva nel localStorage per usarlo nella pagina torneo
+                    localStorage.setItem("tournamentData", JSON.stringify({ ...tournamentData, tournamentId }));
+
+                    // Reindirizza alla pagina torneo
+                    navigate("/tournament");
+                  }}
+                  className="flex-1"
                   >
-                    OK
-                  </Button>
+                  OK
+                </Button>
                   <Button variant="outline" onClick={closeModal} className="flex-1">
                     Cancella
                   </Button>
