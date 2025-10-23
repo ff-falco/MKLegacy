@@ -10,7 +10,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/tierlist" element={<TierListPage />} />
-        <Route path="/tournament" element={<TournamentPage />} />
+        <Route path="/tournament/:code" element={<TournamentPage />} />
       </Routes>
     </BrowserRouter>
   );

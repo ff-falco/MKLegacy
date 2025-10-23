@@ -4,10 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite",              
+    "dev:server": "node server/server.js"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
@@ -21,6 +20,8 @@
     "framer-motion": "^12.23.22",
     "i": "^0.3.7",
     "lucide-react": "^0.545.0",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.19.2",
     "node-telegram-bot-api": "^0.66.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
@@ -38,6 +39,7 @@
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",

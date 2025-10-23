@@ -27,6 +27,8 @@ export default function LandingPage() {
   const [hovering, setHovering] = useState(false);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+
+  
   // Apertura/chiusura modale
   const openCreateModal = () => { setModalType("create"); setShowModal(true); };
   const openResumeModal = () => { setModalType("resume"); setShowModal(true); };
@@ -205,23 +207,43 @@ export default function LandingPage() {
                 <div className="flex justify-between gap-4">
                 <Button
                   variant="default"
-                  onClick={() => {
+                  onClick={async () => {
                     const tournamentData = {
                       name: formData.name,
-                      players: formData.players,
-                      stations: formData.stations,
+                      totalPlayers: Number(formData.players),
+                      stations: Number(formData.stations),
                       date: formData.date,
                       tierCode: tierCode,
                     };
-                    
-                    // Genera un codice univoco
-                    const tournamentId = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-                    // Salva nel localStorage per usarlo nella pagina torneo
-                    localStorage.setItem("tournamentData", JSON.stringify({ ...tournamentData, tournamentId }));
-
-                    // Reindirizza alla pagina torneo
-                    navigate("/tournament");
+              
+                    // Genera un codice univoco per il torneo
+                    const tournamentCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+              
+                    try {
+                      // Chiamata POST all'API per creare il torneo
+                      const res = await fetch("http://localhost:4000/api/tournament", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          code: tournamentCode,
+                          ...tournamentData
+                        })
+                      });
+              
+                      if (!res.ok) throw new Error("Errore nella creazione del torneo");
+              
+                      const createdTournament = await res.json();
+              
+                      // Salva i dati localmente per usarli nella tournament page
+                      localStorage.setItem("tournamentData", JSON.stringify(createdTournament));
+              
+                      // Reindirizza alla tournament page
+                      navigate(`/tournament/${createdTournament.code}`, { state: { fromCreate: true } });
+              
+                    } catch (err) {
+                      console.error(err);
+                      alert("Errore nella creazione del torneo!");
+                    }
                   }}
                   className="flex-1"
                   >
@@ -237,18 +259,33 @@ export default function LandingPage() {
                 <h3 className="text-lg font-bold text-center">Riprendi torneo</h3>
                 <input
                   type="text"
-                  maxLength={5}
+                  maxLength={6}
                   placeholder="Codice torneo"
                   value={tournamentCode}
                   onChange={(e) => setTournamentCode(e.target.value)}
                   className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="flex justify-between gap-4">
-                  <Button
+                <Button
                     variant="default"
-                    onClick={() => {
-                      alert(`Codice inserito: ${tournamentCode}`);
-                      closeModal();
+                    onClick={async () => {
+                      if (!tournamentCode) return alert("Inserisci un codice torneo");
+
+                      try {
+                        const res = await fetch(`http://localhost:4000/api/tournament/${tournamentCode}`);
+                        if (!res.ok) throw new Error("Torneo non trovato");
+
+                        const tournament = await res.json();
+
+                        // Salva codice torneo localmente
+                        localStorage.setItem("tournamentCode", tournament.code);
+
+                        // Naviga alla tournament page
+                        navigate(`/tournament/${tournament.code}`,{ state: { code: tournament.code } });
+                      } catch (err) {
+                        console.error(err);
+                        alert("Torneo non trovato!");
+                      }
                     }}
                     className="flex-1"
                   >
