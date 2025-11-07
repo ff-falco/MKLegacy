@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,11 @@ interface Participant {
   id: number;
   nickname: string;
   name: string;
+  seeding?: number;
 }
 
 export default function TournamentPage() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { code, fromCreate } = location.state as { code?: string; fromCreate?: boolean };
 
@@ -50,6 +52,15 @@ export default function TournamentPage() {
   const totalPlayers = Number(tournament.totalPlayers);
   const slots = Array.from({ length: totalPlayers }, (_, i) => participants[i] ?? null);
 
+  // --- FUNZIONE CAMBIA SEEDING ---
+  const handleChangeSeeding = (nickname: string, seeding: number) => {
+    axios
+      .post(`http://localhost:4000/api/tournament/${tournament.code}/seed`, { nickname, seeding })
+      .then(() => axios.get(`http://localhost:4000/api/tournament/${tournament.code}`))
+      .then((res) => setParticipants(res.data.participants ?? []))
+      .catch((err) => console.error(err));
+  };
+
   // --- FUNZIONE AGGIUNGI PARTECIPANTE ---
   const handleAddParticipant = () => {
     if (!newParticipant.name || !newParticipant.nickname) return;
@@ -69,6 +80,32 @@ export default function TournamentPage() {
       .catch((err) => console.error(err));
   };
 
+  // --- FUNZIONE AGGIUNGI MOCK PARTECIPANTI ---
+const handleAddMockParticipants = async () => {
+  if (!tournament) return;
+
+  const totalPlayers = Number(tournament.totalPlayers)-participants.length;
+  const mockParticipants = Array.from({ length: totalPlayers }, (_, i) => ({
+    name: `Giocatore ${i + 1}`,
+    nickname: `nick${i + 1}`,
+    seeding: Math.floor(Math.random() * totalPlayers) + 1,
+  }));
+
+  try {
+    // Aggiungiamo in sequenza tutti i giocatori mock
+    for (const p of mockParticipants) {
+      await axios.post(`http://localhost:4000/api/tournament/${tournament.code}/join`, p);
+    }
+
+    // Poi aggiorniamo i partecipanti dal server
+    const res = await axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
+    setParticipants(res.data.participants ?? []);
+    alert("Giocatori mock aggiunti con successo!");
+  } catch (err) {
+    console.error(err);
+  }
+};
+
   // --- FUNZIONE RIMUOVI PARTECIPANTE ---
   const handleRemoveParticipant = (nickname: String) => {
   axios
@@ -87,6 +124,7 @@ export default function TournamentPage() {
           <strong>Data:</strong> {tournament.date} —{" "}
           <strong>Giocatori previsti:</strong> {tournament.totalPlayers}
           <strong> — Codice:</strong> {tournament.code}
+          <strong> — Numero Gare:</strong> {tournament.maxraces}
         </p>
 
         {/* Lista partecipanti */}
@@ -108,6 +146,27 @@ export default function TournamentPage() {
                   <>
                     <span className="font-semibold text-gray-800">{p.name}</span>
                     <span className="text-sm text-gray-500">{p.nickname}</span>
+                    {/* Seeding Selector */}
+                    <select
+                      className="mt-2 border rounded-md px-2 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      value={p.seeding ? String(p.seeding) : ""}
+                      onChange={(e) => handleChangeSeeding(p.nickname, Number(e.target.value))}
+                    >
+                      <option value="">Seeding</option>
+                      {Array.from({ length: totalPlayers }, (_, j) => j + 1)
+                        .filter(
+                          (s) =>
+                            !participants.some(
+                              (other) => other.seeding === s && other.nickname !== p.nickname
+                            )
+                        )
+                        .map((s) => (
+                          <option key={s} value={String(s)}>
+                            {s}
+                          </option>
+                        ))}
+                    </select>
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -148,14 +207,14 @@ export default function TournamentPage() {
                 placeholder="Nome"
                 value={newParticipant.name}
                 onChange={(e) => setNewParticipant({ ...newParticipant, name: e.target.value })}
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white "
               />
               <input
                 type="text"
                 placeholder="Nickname"
                 value={newParticipant.nickname}
                 onChange={(e) => setNewParticipant({ ...newParticipant, nickname: e.target.value })}
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white "
               />
               <div className="flex gap-4 mt-4">
                 <Button variant="default" onClick={handleAddParticipant} className="flex-1">✅ Aggiungi</Button>
@@ -166,20 +225,35 @@ export default function TournamentPage() {
         )}
 
         <Button variant="default" onClick={() => setShowForm(true)}>➕ Aggiungi partecipante</Button>
+        <Button
+          variant="secondary"
+          onClick={handleAddMockParticipants}
+          className="mt-2"
+        >
+          🧩 Aggiungi partecipanti di test
+        </Button>
         <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
-  <Button
-    variant="default"
-    disabled={participants.length < totalPlayers || tournament.started}
-    onClick={() => {
-      const ok = window.confirm("Sei sicuro di voler avviare il torneo?");
-      if (!ok) return;
-      alert("🏁 Il torneo è iniziato!");
-      setTournament((prev: any) => ({ ...prev, started: true }));
-    }}
-    className={participants.length < totalPlayers || tournament.started ? "opacity-50 cursor-not-allowed" : ""}
-  >
-    🏁 Avvia torneo
-  </Button>
+        <Button
+          variant="default"
+          disabled={participants.length < totalPlayers || tournament.started}
+          onClick={() => {
+            const ok = window.confirm("Vuoi andare al pre-torneo?");
+            if (!ok) return;
+
+            // Aggiorna lo stato nel DB
+            axios
+              .patch(`http://localhost:4000/api/tournament/${tournament.code}/start`)
+              .then(() => {
+                setTournament((prev: any) => ({ ...prev, started: true })); // aggiorna anche lo stato locale
+                navigate(`/pretournament/${tournament.code}`);
+              })
+              .catch((err) => console.error(err));
+          }}
+          className={participants.length < totalPlayers || tournament.started ? "opacity-50 cursor-not-allowed" : ""}
+        >
+          🏁 Avvia torneo
+        </Button>
+
 
   <Button
     variant="destructive"

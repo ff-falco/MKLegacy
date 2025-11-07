@@ -18,6 +18,7 @@ export default function LandingPage() {
     players: "",
     stations: "",
     date: "",
+    races: "",
   });
   const [tournamentCode, setTournamentCode] = useState("");
   const [tierCode, setTierCode] = useState("");
@@ -35,7 +36,7 @@ export default function LandingPage() {
   const closeModal = () => {
     setShowModal(false);
     setModalType(null);
-    setFormData({ name: "", players: "", stations: "", date: "" });
+    setFormData({ name: "", players: "", stations: "", date: "" , races: ""});
     setTournamentCode("");
     setTierCode("");
   };
@@ -156,6 +157,14 @@ export default function LandingPage() {
                 />
 
                 <input
+                  type="number"
+                  placeholder="Numero gare"
+                  value={formData.races}
+                  onChange={(e) => setFormData({ ...formData, races: e.target.value })}
+                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
@@ -208,17 +217,36 @@ export default function LandingPage() {
                 <Button
                   variant="default"
                   onClick={async () => {
+                    // Se i campi non sono compilati, non fare nulla
+                    if (
+                      !formData.name ||
+                      !formData.players ||
+                      !formData.stations ||
+                      !formData.date ||
+                      !formData.races
+                    ) {
+                      //evidenzia i campi mancanti di rosso
+                      return alert("Per favore, compila tutti i campi.");
+                      
+                    }
+                    const positionsarray = [];
+                    console.log("Stations:", formData.stations);
+                    for (let i = 1; i < (Number(formData.stations)+1); i++) 
+                      positionsarray.push(i);
                     const tournamentData = {
                       name: formData.name,
+                      date: formData.date,
                       totalPlayers: Number(formData.players),
                       stations: Number(formData.stations),
-                      date: formData.date,
-                      tierCode: tierCode,
+                      tiercode: tierCode,
+                      startingpositions: positionsarray,
+                      seriescount: Math.ceil(Number(formData.players) / Number(formData.stations)),
+                      maxraces: Number(formData.races),
                     };
               
                     // Genera un codice univoco per il torneo
                     const tournamentCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-              
+                    
                     try {
                       // Chiamata POST all'API per creare il torneo
                       const res = await fetch("http://localhost:4000/api/tournament", {
@@ -281,7 +309,13 @@ export default function LandingPage() {
                         localStorage.setItem("tournamentCode", tournament.code);
 
                         // Naviga alla tournament page
-                        navigate(`/tournament/${tournament.code}`,{ state: { code: tournament.code } });
+                        if (tournament.started && !tournament.reviewed) {
+                          navigate(`/pretournament/${tournament.code}`);
+                        } else if (tournament.reviewed) {
+                          navigate(`/racemanager/${tournament.code}`);
+                        } else {
+                          navigate(`/tournament/${tournament.code}`);
+                        }
                       } catch (err) {
                         console.error(err);
                         alert("Torneo non trovato!");
