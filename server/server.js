@@ -45,7 +45,6 @@ mongoose
 // ----------------------------------------------------------------------
 
 
-app.listen(PORT, () => console.log(`✅ Server avviato su porta ${PORT}`));
 
 /* -------------------------- API TORNEI -------------------------- */
 
@@ -734,3 +733,5 @@ app.post("/api/tournament/:code/leave", async (req, res) => {
 
 
 
+
+app.listen(PORT, () => console.log(`✅ Server avviato su porta ${PORT}`));
