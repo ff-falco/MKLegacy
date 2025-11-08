@@ -229,7 +229,7 @@ export default function TournamentPage() {
                     <span className="text-sm text-gray-500">{p.nickname}</span>
                     {/* Seeding Selector */}
                     <select
-                      className="mt-2 border rounded-md px-2 py-1 text-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="mt-2 border rounded-md px-2 py-1 text-sm bg-white text-black bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
                       value={p.seeding ? String(p.seeding) : ""}
                       onChange={(e) => handleChangeSeeding(p.nickname, Number(e.target.value))}
                     >

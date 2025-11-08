@@ -137,7 +137,7 @@ export default function LandingPage() {
                   placeholder="Nome torneo"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <input
@@ -145,7 +145,7 @@ export default function LandingPage() {
                   placeholder="Numero di giocatori"
                   value={formData.players}
                   onChange={(e) => setFormData({ ...formData, players: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <input
@@ -153,7 +153,7 @@ export default function LandingPage() {
                   placeholder="Numero di postazioni"
                   value={formData.stations}
                   onChange={(e) => setFormData({ ...formData, stations: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <input
@@ -161,14 +161,14 @@ export default function LandingPage() {
                   placeholder="Numero gare"
                   value={formData.races}
                   onChange={(e) => setFormData({ ...formData, races: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
 
                 {/* --- Codice Tier List --- */}
@@ -179,7 +179,7 @@ export default function LandingPage() {
                     placeholder="Codice Tier List"
                     value={tierCode}
                     onChange={(e) => setTierCode(e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <div
                     ref={tooltipRef}
@@ -291,7 +291,7 @@ export default function LandingPage() {
                   placeholder="Codice torneo"
                   value={tournamentCode}
                   onChange={(e) => setTournamentCode(e.target.value)}
-                  className="w-full border px-3 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="flex justify-between gap-4">
                 <Button

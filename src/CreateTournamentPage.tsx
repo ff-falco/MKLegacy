@@ -42,7 +42,7 @@ export default function CreateTournamentPage() {
               value={formData.name}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-black"
               placeholder="Inserisci il nome"
             />
           </div>
@@ -58,7 +58,7 @@ export default function CreateTournamentPage() {
               value={formData.players}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Inserisci il numero"
             />
           </div>
@@ -74,7 +74,7 @@ export default function CreateTournamentPage() {
               value={formData.stations}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Inserisci il numero"
             />
           </div>
@@ -90,7 +90,7 @@ export default function CreateTournamentPage() {
               value={formData.date}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 

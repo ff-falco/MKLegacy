@@ -241,7 +241,7 @@ export default function PreTournamentPage() {
             // ✅ CORREZIONE 2: Cambiato 'text-white' in 'text-gray-900'.
             // Il tuo input era su uno sfondo 'bg-gray-50' (quasi bianco),
             // quindi 'text-white' rendeva il numero digitato invisibile.
-            className="text-white w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="bg-white text-black w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
       </div>
     ))}
@@ -287,7 +287,7 @@ export default function PreTournamentPage() {
               const val = Number(e.target.value);
               if (val >= MIN_INCREMENTO && val <= MAX_INCREMENTO) setIncremento(val);
             }}
-            className="text-white w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="bg-white text-black w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <p className="text-xs text-gray-400 mt-1">
             (Quanto i punti aumentano in base alla serie)
@@ -312,7 +312,7 @@ export default function PreTournamentPage() {
                 setIncremento(0);
               
             }}
-            className="text-white w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="bg-white text-black w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <p className="text-xs text-gray-400 mt-1">
             (Seleziona i giocatori che salgono o scendono di gruppo in base al risultato)

@@ -651,7 +651,7 @@ export default function RaceManagerPage() {
                               {/* Sostituzione della "beer" label */}
                             {tournament.race>1 && (
                               <div className="flex flex-col items-end gap-1">
-                                <label className="flex items-center cursor-pointer select-none text-sm whitespace-nowrap">
+                                <label className="bg-white text-black flex items-center cursor-pointer select-none text-sm whitespace-nowrap">
                                   <input
                                     type="checkbox"
                                     checked={p.isManualScore}
@@ -674,7 +674,7 @@ export default function RaceManagerPage() {
                                     }
                                     // --- 🚨 INIZIO FIX 🚨 ---
                                     // Rimosso 'text-white' che rendeva il testo invisibile
-                                    className="border rounded px-2 py-1 text-sm w-24" 
+                                    className="bg-white text-black border rounded px-2 py-1 text-sm w-24" 
                                     // --- 🚨 FINE FIX 🚨 ---
                                   />
                                 )}
