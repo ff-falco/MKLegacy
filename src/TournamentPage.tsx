@@ -53,7 +53,7 @@ export default function TournamentPage() {
       }
     } else if (code) {
       axios
-        .get(`http://localhost:4000/api/tournament/${code}`)
+        .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
         .then((res) => {
           const t = res.data;
           setTournament(t);
@@ -82,8 +82,8 @@ export default function TournamentPage() {
   // --- FUNZIONE CAMBIA SEEDING ---
   const handleChangeSeeding = (nickname: string, seeding: number) => {
     axios
-      .post(`http://localhost:4000/api/tournament/${tournament.code}/seed`, { nickname, seeding })
-      .then(() => axios.get(`http://localhost:4000/api/tournament/${tournament.code}`))
+      .post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/seed`, { nickname, seeding })
+      .then(() => axios.get(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`))
       .then((res) => setParticipants(res.data.participants ?? []))
       .catch((err) => console.error(err));
   };
@@ -124,14 +124,14 @@ export default function TournamentPage() {
     axios
       // --- 🚨 INIZIO FIX: TRIM 🚨 ---
       // 4. Invia i dati puliti (trimmed) al backend
-      .post(`http://localhost:4000/api/tournament/${tournament.code}/join`, {
+      .post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/join`, {
         name: trimmedName,
         nickname: trimmedNickname
       })
       // --- 🚨 FINE FIX: TRIM 🚨 ---
       .then(() => {
         // GET per aggiornare i partecipanti
-        return axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
+        return axios.get(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`);
       })
       .then((res) => {
         const updated = res.data.participants ?? [];
@@ -161,11 +161,11 @@ export default function TournamentPage() {
     try {
       // Aggiungiamo in sequenza tutti i giocatori mock
       for (const p of mockParticipants) {
-        await axios.post(`http://localhost:4000/api/tournament/${tournament.code}/join`, p);
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/join`, p);
       }
 
       // Poi aggiorniamo i partecipanti dal server
-      const res = await axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`);
       setParticipants(res.data.participants ?? []);
       await showModalMessage("Giocatori mock aggiunti con successo!");
     } catch (err) {
@@ -180,8 +180,8 @@ export default function TournamentPage() {
     if (!ok) return;
 
     axios
-      .post(`http://localhost:4000/api/tournament/${tournament.code}/leave`, { nickname })
-      .then(() => axios.get(`http://localhost:4000/api/tournament/${tournament.code}`))
+      .post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/leave`, { nickname })
+      .then(() => axios.get(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`))
       .then((res) => {
         setParticipants(res.data.participants ?? []);
       })
@@ -333,7 +333,7 @@ export default function TournamentPage() {
 
               // Aggiorna lo stato nel DB
               axios
-                .patch(`http://localhost:4000/api/tournament/${tournament.code}/start`)
+                .patch(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/start`)
                 .then(() => {
                   setTournament((prev: any) => ({ ...prev, started: true })); // aggiorna anche lo stato locale
                   navigate(`/pretournament/${tournament.code}`);
@@ -354,7 +354,7 @@ export default function TournamentPage() {
               if (!ok) return;
 
               axios
-                .delete(`http://localhost:4000/api/tournament/${tournament.code}`)
+                .delete(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`)
                 .then(() => {
                   showModalMessage("Torneo cancellato!");
                   navigate("/"); // Usiamo navigate

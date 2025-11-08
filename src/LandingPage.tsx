@@ -81,8 +81,6 @@ export default function LandingPage() {
     setShowInfo(true);
     setTimeout(() => setShowInfo(false), 3000);
   };
-
-  
   
 
   
@@ -251,7 +249,7 @@ export default function LandingPage() {
                     
                     try {
                       // Chiamata POST all'API per creare il torneo
-                      const res = await fetch("http://localhost:4000/api/tournament", {
+                      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tournament`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -302,7 +300,7 @@ export default function LandingPage() {
                       if (!tournamentCode) return alert("Inserisci un codice torneo");
 
                       try {
-                        const res = await fetch(`http://localhost:4000/api/tournament/${tournamentCode}`);
+                        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tournament/${tournamentCode}`);
                         if (!res.ok) throw new Error("Torneo non trovato");
 
                         const tournament = await res.json();

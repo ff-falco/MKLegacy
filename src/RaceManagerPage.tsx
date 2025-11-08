@@ -80,7 +80,7 @@ export default function RaceManagerPage() {
     if (!code) return;
     
     axios
-      .get(`http://localhost:4000/api/tournament/${code}`)
+      .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
       .then((res) => {
         const t: Tournament = res.data;
 
@@ -284,7 +284,7 @@ export default function RaceManagerPage() {
     updatedTemporaryResults = [...updatedTemporaryResults, ...groupResults];
   
     axios
-      .post(`http://localhost:4000/api/tournament/${code}/temporary-results`, {
+      .post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/temporary-results`, {
         temporaryResults: updatedTemporaryResults,
         positionsTaken: positionsTaken,
       })
@@ -369,7 +369,7 @@ export default function RaceManagerPage() {
     if (!conferma) return;
 
     try {
-      await axios.post(`http://localhost:4000/api/tournament/${code}/rewind`);
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/rewind`);
       showModalMessage("✅ Tutti i risultati sono stati ripristinati");
       // Ricarica la pagina per aggiornare lo stato del torneo
       window.location.reload();
@@ -502,21 +502,21 @@ export default function RaceManagerPage() {
     try {
       if (isFinalRace) {
         // Chiamata per terminare il torneo
-        await axios.post(`http://localhost:4000/api/tournament/${code}/finale`); 
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/finale`); 
         showModalMessage("✅ Torneo terminato! La classifica finale è disponibile.");
       } else if (isQualifyingRace) {
         // Qualifiche (Gara 1)
-        await axios.post(`http://localhost:4000/api/tournament/${code}/qualify`);
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/qualify`);
         showModalMessage("✅ Tutti i risultati sono stati salvati! Si passa alla prossima gara.");
 
       } else if (nextIsFinalRace) {
         // Ultima gara prima della finale
-        await axios.post(`http://localhost:4000/api/tournament/${code}/finale-preparation`);
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/finale-preparation`);
         showModalMessage("✅ Tutti i risultati sono stati salvati! Si passa alla Finale.");
     
       }else {
         // Gara intermedia (race > 1 e non finale)
-        await axios.post(`http://localhost:4000/api/tournament/${code}/next-race`);
+        await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${code}/next-race`);
         showModalMessage("✅ Tutti i risultati sono stati salvati! Si passa alla prossima gara.");
       }
       

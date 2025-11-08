@@ -27,7 +27,7 @@ export default function PreTournamentPage() {
     if (!code) return;
 
     axios
-      .get(`http://localhost:4000/api/tournament/${code}`)
+      .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
       .then((res) => {
         const t = res.data;
         setTournament(t);
@@ -331,7 +331,7 @@ export default function PreTournamentPage() {
             if (!ok) return;
 
             axios
-              .patch(`http://localhost:4000/api/tournament/${tournament.code}/review`, {
+              .patch(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/review`, {
                 groups: createGroups(tournament.participants, tournament.stations),
                 seriesIncrement:incremento,
                 seriesThreshold: soglia,
@@ -352,7 +352,7 @@ export default function PreTournamentPage() {
           onClick={() => {
             const ok = window.confirm("Vuoi davvero cancellare questo torneo?");
             if (!ok) return;
-            axios.delete(`http://localhost:4000/api/tournament/${tournament.code}`).then(() => {
+            axios.delete(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`).then(() => {
               navigate("/");
             });
           }}
