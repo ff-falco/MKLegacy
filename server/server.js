@@ -18,20 +18,34 @@ const PORT = process.env.PORT || 4000;
 // 2. Connessione MongoDB: Usa una variabile d'ambiente per la stringa di connessione.
 // DEV: usa la connessione locale con Docker (mongodb://localhost:27017)
 // PROD: usa la stringa di Atlas (o l'URL del tuo database deployato)
+
+/* -------------------------- CONNESSIONE MONGODB LOCALE -------------------------- */
+/*
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/mklbot";
-// NOTA: Ho aggiunto il nome del tuo database ('mklbot') alla stringa di connessione locale.
+
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("✅ MongoDB connesso (URI:", MONGO_URI, ")"))
+  .catch((err) => console.error("❌ Errore connessione MongoDB:", err));
+
+
+app.listen(PORT, () => console.log(`✅ Server avviato su porta ${PORT}`));
+
+*/
+
+/* -------------------------- CONNESSIONE MONGODB ATLAS -------------------------- */
+
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://filippomorellimorelli_db_user:ffe1Qk7RKX0tAkB1@cluster0.oipegrc.mongodb.net/mklbot?retryWrites=true&w=majority&appName=Cluster0";
 
 // 🔗 Connessione MongoDB
 mongoose
   .connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB connesso (URI:", MONGO_URI, ")"))
+  .then(() => console.log("✅ MongoDB connesso")) // Log come da tua richiesta
   .catch((err) => console.error("❌ Errore connessione MongoDB:", err));
 // ----------------------------------------------------------------------
 
 
 app.listen(PORT, () => console.log(`✅ Server avviato su porta ${PORT}`));
-
-
 
 /* -------------------------- API TORNEI -------------------------- */
 
