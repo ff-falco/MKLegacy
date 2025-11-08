@@ -9,16 +9,25 @@ const ResultSchema = new mongoose.Schema({
   nextposition: Number,
   nextserie: Number,
   points: Number,
+  manual: {type: Boolean, default : false },
+  startingposition: Number,
 });
 
 const TemporaryResultSchema = new mongoose.Schema({
   nickname: String,
   serie: Number,
   position: Number,
-  nextposition: Number,
-  nextserie: Number,
-  beer: { type: Boolean, default: true },
-  points: Number,
+  nextposition: Number, // Questo campo non sembra essere inviato, ma lo teniamo per ora
+  nextserie: Number, // Questo campo non sembra essere inviato, ma lo teniamo per ora
+  
+  // Sostituiamo 'beer' con 'isManualScore'
+  manual: { type: Boolean, default: false }, 
+  
+  // Sostituiamo 'points' (che era ambiguo) con 'manualScore'
+  // Usiamo 'null' come default per indicare "non impostato"
+  manualScore: { type: Number, default: null }, 
+  
+  startingposition: Number,
 });
 
 const ParticipantSchema = new mongoose.Schema({

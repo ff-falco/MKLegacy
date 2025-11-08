@@ -2,21 +2,36 @@ import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import mongoose from "mongoose";
-import Tournament from "./models/Tournament.js";
-import { group } from "console";
+import Tournament from "./models/Tournament.js"; // Assicurati che il path sia corretto, qui assumiamo che sia .js
+import { m } from "framer-motion";
+import { start } from "repl";
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = 4000;
-app.listen(PORT, () => console.log(`✅ Server avviato su http://localhost:${PORT}`));
+// ----------------------------------------------------------------------
+// 🚨 MODIFICA CRITICA QUI 🚨
+// 1. Porta: Usa la variabile d'ambiente PORT (tipica per l'hosting) o 4000 come fallback.
+const PORT = process.env.PORT || 4000;
+
+// 2. Connessione MongoDB: Usa una variabile d'ambiente per la stringa di connessione.
+// DEV: usa la connessione locale con Docker (mongodb://localhost:27017)
+// PROD: usa la stringa di Atlas (o l'URL del tuo database deployato)
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/mklbot";
+// NOTA: Ho aggiunto il nome del tuo database ('mklbot') alla stringa di connessione locale.
 
 // 🔗 Connessione MongoDB
 mongoose
-  .connect("mongodb+srv://filippomorellimorelli_db_user:ffe1Qk7RKX0tAkB1@cluster0.oipegrc.mongodb.net/mklbot?retryWrites=true&w=majority&appName=Cluster0")
-  .then(() => console.log("✅ MongoDB connesso"))
+  .connect(MONGO_URI)
+  .then(() => console.log("✅ MongoDB connesso (URI:", MONGO_URI, ")"))
   .catch((err) => console.error("❌ Errore connessione MongoDB:", err));
+// ----------------------------------------------------------------------
+
+
+app.listen(PORT, () => console.log(`✅ Server avviato su porta ${PORT}`));
+
+
 
 /* -------------------------- API TORNEI -------------------------- */
 
@@ -194,7 +209,7 @@ app.post("/api/tournament/:code/temporary-results", async (req, res) => {
     await tournament.save();
 
     console.log("💾 Salvato su DB:", tournament.temporaryResults); // 👈 Log dopo il salvataggio
-
+    console.log("💾 Posizioni prese salvate su DB:", tournament.stationsPositions); // 👈 Log dopo il salvataggio
     res.status(200).json({
       message: "Risultati temporanei aggiornati",
       temporaryResults: tournament.temporaryResults,
@@ -205,7 +220,62 @@ app.post("/api/tournament/:code/temporary-results", async (req, res) => {
   }
 });
 
-// Risultati Qualifiche
+// Implementazione rewind (DA FINIRE)
+app.post("/api/tournament/:code/rewind", async (req, res) => {
+  const { code } = req.params;
+
+  try {
+    const tournament = await Tournament.findOne({ code });
+    if (!tournament) return res.status(404).send("Torneo non trovato");
+
+    const { temporaryResults, participants, race } = tournament;
+    let newtemporaryResults=[];
+
+    tournament.race--;
+
+    
+    //Salva i risultati della scorsa gara come temporaryresult in questo vettore
+    for (let i = 0; i < tournament.participants.length; i++) {
+      
+      let temporary={};
+      let lastresult=tournament.participants[i].results.pop()
+      temporary.nickname=tournament.participants[i].nickname
+      temporary.serie=lastresult.serie
+      temporary.position=lastresult.position
+      temporary.manualScore=lastresult.points
+      temporary.nextposition=tournament.participants[i].nextposition
+      temporary.nextserie=tournament.participants[i].nextserie
+      temporary.manual= lastresult.manual
+
+      temporary.startingposition=lastresult.startingposition
+
+      newtemporaryResults.push(temporary)
+      console.log("Last result for", tournament.participants[i].nickname, ":", lastresult)
+      console.log("Temporary result to push:", temporary)
+      console.log("Temporary result created:", lastresult.serie, lastresult.startingposition);
+      tournament.participants[i].nextserie=lastresult.serie
+      tournament.participants[i].nextposition=lastresult.startingposition
+      tournament.participants[i].points-=lastresult.points
+    }
+
+  
+    tournament.temporaryResults = newtemporaryResults;
+    await tournament.save();
+
+    res.status(200).json({
+      message: "Rollback eseguito",
+      race: tournament.race,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Errore interno");
+  }
+});
+
+
+
+
+
 app.post("/api/tournament/:code/qualify", async (req, res) => {
   const { code, partecipants } = req.params;
 
@@ -244,7 +314,9 @@ app.post("/api/tournament/:code/qualify", async (req, res) => {
           nextposition: tr.nextposition,
           nextserie: tr.nextserie,
           points: 0,
+          startingposition: tr.startingposition,
         };
+        console.log("Risultato qualifiche per partecipante:", p.nickname, result);
         p.results.push(result);
       }
     });
@@ -263,6 +335,16 @@ app.post("/api/tournament/:code/qualify", async (req, res) => {
     res.status(500).send("Errore interno");
   }
 });
+
+
+
+
+
+
+
+
+
+
 
 // ➡️ Passa alla gara successiva
 app.post("/api/tournament/:code/next-race", async (req, res) => {
@@ -323,7 +405,21 @@ app.post("/api/tournament/:code/next-race", async (req, res) => {
         ;
       }
       if (p) {
-        let pointsearned=(tournament.stations - (tr.position)+1) + (tournament.seriesCount-tr.serie) * tournament.seriesIncrement;
+        let pointsearned = 0;
+
+        // Controlla se il risultato è manuale (come inviato dal frontend)
+        // tr.isManualScore === true && tr.manualScore !== null
+        // (Controlliamo anche 'tr.beer' per retrocompatibilità, sebbene il front-end usi 'isManualScore')
+        if ((tr.manual === true && tr.manualScore !== null)) {
+          // Usa il punteggio manuale
+          // Diamo priorità ai nuovi campi 'manualScore', fallback sui vecchi 'points'
+          pointsearned = tr.manualScore ?? 0;
+          console.log(`Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
+        } else {
+          // Altrimenti, usa la formula basata sulla posizione
+          pointsearned = (tournament.stations - (tr.position) + 1) + (tournament.seriesCount - tr.serie) * tournament.seriesIncrement;
+          console.log(`Punteggio automatico per ${p.nickname}: ${pointsearned}`);
+        }
         const result = {
           serie: tr.serie,
           station: tr.position,
@@ -331,14 +427,15 @@ app.post("/api/tournament/:code/next-race", async (req, res) => {
           nextposition: newposition,
           nextserie: newserie,
           points: pointsearned,
+          manual: tr.manual,
+          startingposition: tr.startingposition,
         };
+        console.log("Risultato qualifiche per partecipante:", p.nickname, result);
+
         p.nextserie = newserie;
         p.nextposition = newposition;
         p.results.push(result);
-        if (tr.beer)
-          p.points += tr.points;
-        else
-          p.points += pointsearned;
+        p.points += pointsearned;
       }
       console.log("Nuova serie e posizione per partecipante:", p.nickname, "Nuova serie:", p.nextserie, "Nuova posizione:", p.nextposition);
     });
@@ -357,6 +454,17 @@ app.post("/api/tournament/:code/next-race", async (req, res) => {
     res.status(500).send("Errore interno");
   }
 });
+
+
+
+
+
+
+
+
+
+
+
 // ➡️ Passa alla gara successiva FINALE TO DO
 app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
   const { code, partecipants } = req.params;
@@ -382,31 +490,65 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
       avaiablepositions[nextserie]--;
     }
 
-   //sorti i partecipanti per punti
-    temporaryResults.sort((a, b) => {
-      const participantA = participants.find(p => p.nickname === a.nickname);
-      const participantB = participants.find(p => p.nickname === b.nickname);
-      return participantB.points - participantA.points;
-    });
-  
     
 
     temporaryResults.forEach(tr => {
       const p = participants.find(pp => pp.nickname === tr.nickname);
       console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
+      // Calcolo nuova serie in base alla posizione
+      let newserie;
+      if(tr.position<=seriesThreshold && p.nextserie>1) //promozione
+        newserie=p.nextserie-1;
+      else if(tr.position>(tournament.stations-seriesThreshold) && p.nextserie<tournament.seriesCount) //retrocessione
+        newserie=p.nextserie+1;
+      else
+        newserie=p.nextserie;
 
-
-      // Calcolo nuova serie in base alla posizione(se sei nei primi 50% vai nella serie 1, altrimenti serie 2)
-      let newserie= Math.floor(temporaryResults.indexOf(tr)/tournament.stations) +1;
-      let modulo=(temporaryResults.indexOf(tr))%tournament.stations;
-      let newposition=tournament.stations - modulo;
-      
-  
-      
       //Calcolo nuova posizione
+      let newposition;
+    
       
+      if (seriesThreshold>0) { // se c'è un incremento di serie
+        if (p.nextserie==tournament.seriesCount-1 && newserie==tournament.seriesCount){// sei retrocesso nell'ultima serie (Momentum negativo)
+          newposition=tr.position;
+          }
+
+        else if(p.nextserie==2 && newserie==1){ // sei promosso nella prima serie (Momentum positivo)
+          newposition=tr.position;
+        }
+        else{
+          newposition=tournament.stations - tr.position +1;
+          }
+      } else { // se non c'è incremento di serie
+        newposition=tournament.stations - tr.position +1;
+        ;
+      }
       if (p) {
-        let pointsearned=(tournament.stations - (tr.position)+1) + (tournament.seriesCount-tr.serie) * tournament.seriesIncrement;
+        const p = participants.find(pp => pp.nickname === tr.nickname);
+        console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
+
+
+        // Calcolo nuova serie in base alla posizione(se sei nei primi 50% vai nella serie 1, altrimenti serie 2)
+        let newserie= Math.floor(temporaryResults.indexOf(tr)/tournament.stations) +1;
+        let modulo=(temporaryResults.indexOf(tr))%tournament.stations;
+        let newposition=tournament.stations - modulo;
+
+
+        let pointsearned = 0;
+
+        // Controlla se il risultato è manuale (come inviato dal frontend)
+        // tr.isManualScore === true && tr.manualScore !== null
+        // (Controlliamo anche 'tr.beer' per retrocompatibilità, sebbene il front-end usi 'isManualScore')
+        if ((tr.manual === true && tr.manualScore !== null)) {
+          // Usa il punteggio manuale
+          // Diamo priorità ai nuovi campi 'manualScore', fallback sui vecchi 'points'
+          pointsearned = tr.manualScore ?? 0;
+          console.log(`Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
+        } else {
+          // Altrimenti, usa la formula basata sulla posizione
+          pointsearned = (tournament.stations - (tr.position) + 1) + (tournament.seriesCount - tr.serie) * tournament.seriesIncrement;
+          console.log(`Punteggio automatico per ${p.nickname}: ${pointsearned}`);
+        }
         const result = {
           serie: tr.serie,
           station: tr.position,
@@ -414,8 +556,10 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
           nextposition: newposition,
           nextserie: newserie,
           points: pointsearned,
+          manual: tr.manual,
+          startingposition: tr.startingposition,
         };
-
+        console.log("Risultato qualifiche per partecipante:", p.nickname, result);
 
         p.nextserie = newserie;
         p.nextposition = newposition;
@@ -427,7 +571,6 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
 
     tournament.temporaryResults = [];
     tournament.race = race + 1;
-
     console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
     await tournament.save();
 
@@ -440,6 +583,9 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
     res.status(500).send("Errore interno");
   }
 });
+
+
+
 
 
 app.post("/api/tournament/:code/finale", async (req, res) => {
@@ -456,15 +602,40 @@ app.post("/api/tournament/:code/finale", async (req, res) => {
     temporaryResults.forEach(tr => {
       const p = participants.find(pp => pp.nickname === tr.nickname);
       if (p) {
-        let pointsearned=(tournament.stations - (tr.position)+1) * tournament.finaleincrement[tr.serie -1];
+        const p = participants.find(pp => pp.nickname === tr.nickname);
+        console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
+
+
+        // Calcolo nuova serie in base alla posizione(se sei nei primi 50% vai nella serie 1, altrimenti serie 2)
+        let newserie= Math.floor(temporaryResults.indexOf(tr)/tournament.stations) +1;
+        let modulo=(temporaryResults.indexOf(tr))%tournament.stations;
+        let newposition=tournament.stations - modulo;
+
+
+        
+        let pointsearned = 0;
+        if ((tr.manual === true && tr.manualScore !== null)) {
+          // Usa il punteggio manuale
+          // Diamo priorità ai nuovi campi 'manualScore', fallback sui vecchi 'points'
+          pointsearned = tr.manualScore ?? 0;
+          console.log(`Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
+        } else {
+          // Altrimenti, usa la formula basata sulla posizione
+          pointsearned = (tournament.stations - (tr.position)+1) * tournament.finaleincrement[tr.serie -1];
+          console.log(`Punteggio automatico per ${p.nickname}: ${pointsearned}`);
+        }
+
         const result = {
           serie: tr.serie,
           station: tr.position,
           position: tr.position,
-          nextposition: tr.position,
-          nextserie: 0,
+          nextposition: newposition,
+          nextserie: newserie,
           points: pointsearned,
+          manual: tr.manual,
+          startingposition: tr.startingposition,
         };
+        
         p.nextserie = 0;
         p.nextposition = 0;
         p.results.push(result);

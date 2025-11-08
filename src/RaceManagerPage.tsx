@@ -11,9 +11,8 @@ interface Participant {
   seeding?: number;
   points?: number;
   currentPosition: number | string;
-  // currentBeer: boolean; // RIMOSSO
-  isManualScore: boolean; // AGGIUNTO
-  manualScore: number | null; // AGGIUNTO
+  isManualScore: boolean;
+  manualScore: number | null;
   nextserie?: number;
   nextposition?: number;
 }
@@ -57,10 +56,22 @@ export default function RaceManagerPage() {
   // Funzione per mostrare un messaggio modale/di conferma invece di window.alert/confirm
   const showModalMessage = (message: string, isConfirm: boolean = false): Promise<boolean> => {
     // Usiamo window.confirm/alert come fallback in questo ambiente
+    // NOTA: window.alert e window.confirm non sono ideali in app moderne,
+    // ma li usiamo come fallback in assenza di un sistema modale.
     if (isConfirm) {
-      return Promise.resolve(window.confirm(message));
+      try {
+        return Promise.resolve(window.confirm(message));
+      } catch (e) {
+        console.warn("window.confirm bloccato o non disponibile.", e);
+        return Promise.resolve(true); // Ritorna true in caso di fallimento
+      }
     }
-    window.alert(message);
+    try {
+      window.alert(message);
+    } catch (e) {
+      console.warn("window.alert bloccato o non disponibile.", e);
+      console.log("Messaggio (fallback):", message);
+    }
     return Promise.resolve(true);
   };
 
@@ -72,6 +83,9 @@ export default function RaceManagerPage() {
       .get(`http://localhost:4000/api/tournament/${code}`)
       .then((res) => {
         const t: Tournament = res.data;
+
+        console.log("Dati torneo ricevuti:", t);
+
         t.participants = t.participants || [];
         t.stations = t.stations || 1;
         t.temporaryResults = t.temporaryResults || [];
@@ -103,9 +117,10 @@ export default function RaceManagerPage() {
                     return {
                         ...p,
                         currentPosition: tr?.position ?? "",
-                        // currentBeer: tr?.beer ?? false, // RIMOSSO
-                        isManualScore: tr?.isManualScore ?? false, // AGGIUNTO
-                        manualScore: tr?.manualScore ?? null, // AGGIUNTO
+                        // Leggiamo 'manual' (dal DB) o 'beer' (vecchio)
+                        isManualScore: tr?.manual ?? tr?.beer ?? false, 
+                        // Leggiamo 'manualScore' (nuovo) o 'points' (vecchio)
+                        manualScore: tr?.manualScore ?? tr?.points ?? null, 
                     } as Participant;
                 });
                 
@@ -129,9 +144,14 @@ export default function RaceManagerPage() {
                         group.push({
                             ...p,
                             currentPosition: tr?.position ?? "",
-                            // currentBeer: tr?.beer ?? false, // RIMOSSO
-                            isManualScore: tr?.isManualScore ?? false, // AGGIUNTO
-                            manualScore: tr?.manualScore ?? null, // AGGIUNTO
+                            
+                            // --- 🚨 INIZIO FIX 🚨 ---
+                            // Corretto: ora legge 'tr.manual' (dal DB) e 'tr.beer' (vecchio)
+                            isManualScore: tr?.manual ?? tr?.beer ?? false, 
+                            // Corretto: ora legge 'tr.manualScore' (nuovo) e 'tr.points' (vecchio)
+                            manualScore: tr?.manualScore ?? tr?.points ?? null, 
+                            // --- 🚨 FINE FIX 🚨 ---
+
                         } as Participant);
                     }
                 }
@@ -244,10 +264,17 @@ export default function RaceManagerPage() {
       .map((p) => ({
         nickname: p.nickname,
         serie: groupIndex + 1,
-        position: p.currentPosition,
-        // beer: p.currentBeer || false, // RIMOSSO
-        beer: p.isManualScore , // AGGIUNTO
-        points: p.manualScore|| 0, // AGGIUNTO
+        position: Number(p.currentPosition), // Assicurati sia un numero
+        
+        // --- 🚨 INIZIO FIX 🚨 ---
+        // Mappa lo stato 'isManualScore' al campo 'manual' del DB
+        manual: p.isManualScore , 
+        // Se è manuale, salva il punteggio (o 0 se vuoto).
+        // Se NON è manuale, salva 'null'.
+        manualScore: p.isManualScore ? (p.manualScore ?? 0) : null,
+        // --- 🚨 FINE FIX 🚨 ---
+        
+        startingposition: p.nextposition || 0,
       }));
   
     let updatedTemporaryResults = [...(tournament?.temporaryResults || [])];
@@ -278,30 +305,81 @@ export default function RaceManagerPage() {
       stationsPositions: positionsTaken as number[]
     }
 
-    // --- ✨ ANIMAZIONE + RIORDINAMENTO DEL GRUPPO SUCCESSIVO ✨ ---
     setGroups((prevGroups) => {
       const newGroups = [...prevGroups];
       const nextGroup = newGroups[groupIndex + 1];
-      const stationsPositions = updatedTournament.stationsPositions || [];
-      if (!nextGroup || stationsPositions.length === 0) return newGroups;
+      
+      // Questo è l'array delle POSIZIONI DI ARRIVO del gruppo corrente (es. [3, 1, 4, 2])
+      const arrivalPositions = updatedTournament.stationsPositions || [];
+
+      // Se non c'è un gruppo successivo o non ci sono posizioni, esci.
+      if (!nextGroup || arrivalPositions.length === 0) return newGroups;
   
-      const reorderedNext = [...nextGroup];
+      // --- 🚨 INIZIO FIX LOGICA RIORDINO 🚨 ---
+
+      // Creiamo un array vuoto per il gruppo riordinato.
+      // La sua lunghezza deve corrispondere a quante posizioni abbiamo.
+      const reorderedGroup: (Participant | null)[] = Array(arrivalPositions.length).fill(null);
+
+      // Iteriamo sull'array delle POSIZIONI DI ARRIVO (es. [3, 1, 4, 2])
+      // 'arrivalPosValue' = 3, 'index' = 0
+      // 'arrivalPosValue' = 1, 'index' = 1
+      // 'arrivalPosValue' = 4, 'index' = 2
+      // 'arrivalPosValue' = 2, 'index' = 3
+      arrivalPositions.forEach((arrivalPosValue, index) => {
+        
+        // Troviamo nel GRUPPO SUCCESSIVO (nextGroup) il partecipante
+        // che ha come 'nextposition' il valore 'arrivalPosValue'.
+        //
+        // Esempio (index 0):
+        // Cerca in 'nextGroup' il partecipante con 'p.nextposition === 3'
+        const participantToMove = nextGroup.find(p => p.nextposition === arrivalPosValue);
+
+        if (participantToMove) {
+          // Inserisci il partecipante trovato nella RIGA 'index'
+          // (Alla riga 0 va il partecipante con nextposition 3)
+          reorderedGroup[index] = participantToMove;
+        }
+      });
   
-      const animatedNext: (Participant | null)[] = Array(reorderedNext.length).fill(null);
-      for (let i = 0; i < reorderedNext.length; i++) {
-        // La posizione che aveva l'i-esimo partecipante ora lo mappa al nuovo posto
-        // stationsPositions[i] è la posizione finale (1-based)
-        const newPos = (stationsPositions[i] ?? i + 1) - 1; // 0-based index
-        animatedNext[newPos] = reorderedNext[i];
-      }
-  
-      newGroups[groupIndex + 1] = animatedNext.filter(p => p !== null) as Group;
+      // Sostituisci il vecchio 'nextGroup' con quello riordinato.
+      // Filtriamo i 'null' per sicurezza, nel caso ci fosse una discrepanza
+      // tra la lunghezza di arrivalPositions e il numero di partecipanti in nextGroup.
+      newGroups[groupIndex + 1] = reorderedGroup.filter(p => p !== null) as Group;
+      
+      // --- 🚨 FINE FIX LOGICA RIORDINO 🚨 ---
   
       return newGroups;
     });
     
   };
-  
+
+
+
+
+  const handleRewind = async () => {
+    if (!tournament) return;
+    
+    
+    const confirmationText = "⚠️ Sei sicuro di voler tornare indietro? Tutti i risultati di questa gara verranno persi definitivamente.";
+
+    // Usiamo la funzione helper per la conferma
+    const conferma = await showModalMessage(confirmationText, true);
+
+    if (!conferma) return;
+
+    try {
+      await axios.post(`http://localhost:4000/api/tournament/${code}/rewind`);
+      showModalMessage("✅ Tutti i risultati sono stati ripristinati");
+      // Ricarica la pagina per aggiornare lo stato del torneo
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      showModalMessage("❌ Errore durante il passaggio alla prossima azione del torneo.");
+    }
+  };
+
+
   // ✅ FUNZIONE PER ASSEGNARE RISULTATI CASUALI (Aggiornata)
   const handleRandomizeGroupResults = (groupIndex: number) => {
     setGroups(prevGroups => {
@@ -317,7 +395,6 @@ export default function RaceManagerPage() {
         return {
           ...p,
           currentPosition: randomPositions[i], // Assegna la posizione casuale univoca
-          // currentBeer: Math.random() < 0.2,   // RIMOSSO
           isManualScore: isManual, // AGGIUNTO
           manualScore: isManual ? Math.floor(Math.random() * 100) : null, // AGGIUNTO (punteggio casuale 0-99)
         };
@@ -386,6 +463,13 @@ export default function RaceManagerPage() {
       return "✅ Termina Torneo";
     }
 
+    // --- 🚨 INIZIO FIX 🚨 ---
+    // Aggiunto controllo per torneo terminato
+    if( tournament.race > tournament.maxraces){
+      return "✅ Torneo Terminato";
+    }
+    // --- 🚨 FINE FIX 🚨 ---
+
     // Gara intermedia
     return "⏭ Prossima Gara";
   };
@@ -393,6 +477,14 @@ export default function RaceManagerPage() {
   // Determina l'azione da eseguire al click del pulsante (LOGICA REINSERITA)
   const handleNextAction = async () => {
     if (!tournament) return;
+
+    // --- 🚨 INIZIO FIX 🚨 ---
+    // Aggiunto controllo per evitare azioni se il torneo è già terminato
+    if (tournament.race > tournament.maxraces) {
+      showModalMessage("Il torneo è già terminato.");
+      return;
+    }
+    // --- 🚨 FINE FIX 🚨 ---
     
     const isQualifyingRace = tournament.race === 1;
     const isFinalRace = tournament.race === tournament.maxraces;
@@ -449,8 +541,19 @@ export default function RaceManagerPage() {
       <p className="text-gray-600 mb-6">
         <strong>Codice:</strong> {tournament.code} — <strong>Postazioni:</strong> {tournament.stations} —{" "}
         <strong>Giocatori:</strong> {tournament.participants.length}
-        {/* Aggiornato il display con maxraces */}
-        <strong> — Gara:</strong> {tournament.race===1 ? "Qualifiche" : tournament.race } / {tournament.maxraces}
+        
+        {/* --- 🚨 INIZIO FIX 🚨 --- */}
+        {/* Logica aggiornata per mostrare Gara/Finale/Qualifiche */}
+        <strong> {tournament.race <= tournament.maxraces ? "— Gara:" : ""} </strong> 
+        {tournament.race <= tournament.maxraces 
+          ? ( tournament.race === 1 
+              ? "Qualifiche" 
+              : (tournament.race === tournament.maxraces 
+                  ? "Finale" 
+                  : `${tournament.race} / ${tournament.maxraces}`)
+            ) 
+          : "Terminato"}
+        {/* --- 🚨 FINE FIX 🚨 --- */}
       </p>
       
       {/* Condizionale: Mostra la gestione dei gruppi SOLO se il torneo non è terminato */}
@@ -473,8 +576,8 @@ export default function RaceManagerPage() {
               } border-gray-200 relative`}
             >
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-lg font-semibold">
-                  🎮 Serie {String.fromCharCode('A'.charCodeAt(0) + i )} {savedGroups.includes(i) && "✅"}
+                <h3 className="text-xl font-semibold">
+                ♦️ Serie {String.fromCharCode('A'.charCodeAt(0) + i )} {savedGroups.includes(i) && "✅"}
                 </h3>
 
                 {savedGroups.includes(i) && (
@@ -510,7 +613,7 @@ export default function RaceManagerPage() {
                             className="p-2 rounded-md bg-blue-50 flex justify-between items-start"
                           >
                             <span className="pt-1">
-                              <strong>{p.seeding ? `#${p.seeding}` : "-"}</strong> {p.name} ({p.nickname})
+                              <strong>{p.seeding ? `#${p.seeding}` : `(${p.nextposition})`}</strong> {p.name} ({p.nickname})
                             </span>
                             
                             {/* Modificato 'items-center' in 'items-start' */}
@@ -556,7 +659,7 @@ export default function RaceManagerPage() {
                                     onChange={() => handleToggleManualScore(p.nickname, i)}
                                     className="mr-1"
                                   />
-                                  Punteggio Manuale
+                                  Manuale
                                 </label>
 
                                 {/* Input numerico condizionale */}
@@ -569,7 +672,10 @@ export default function RaceManagerPage() {
                                     onChange={(e) =>
                                       handleChangeManualScore(p.nickname, i, e.target.value)
                                     }
-                                    className="border rounded px-2 py-1 text-sm w-24 text-white" // Rimosso 'text-white' aggiunto per errore
+                                    // --- 🚨 INIZIO FIX 🚨 ---
+                                    // Rimosso 'text-white' che rendeva il testo invisibile
+                                    className="border rounded px-2 py-1 text-sm w-24" 
+                                    // --- 🚨 FINE FIX 🚨 ---
                                   />
                                 )}
                               </div>
@@ -608,11 +714,13 @@ export default function RaceManagerPage() {
       >
         <h2 className="text-xl font-bold mb-4">🏆 Classifica Generale</h2>
 
-        <ul className="space-y-2">
+        {/* --- 🚨 INIZIO FIX 🚨 --- */}
+        {/* Modifica layout per colonne */}
+        <ul className="columns-2 md:columns-4 gap-x-6">
           {globalRanking.map((p, idx) => (
             <li
               key={p.nickname}
-              className="flex justify-between p-2 rounded-lg bg-gray-50"
+              className="flex justify-between p-2 rounded-lg bg-gray-50 break-inside-avoid mb-2"
             >
               <span className="font-semibold">
                 {idx + 1}. {p.name} ({p.nickname})
@@ -623,37 +731,46 @@ export default function RaceManagerPage() {
             </li>
           ))}
         </ul>
+        {/* --- 🚨 FINE FIX 🚨 --- */}
+
       </motion.div>
       {/* FINE CLASSIFICA GLOBALE */}
 
       <div className="flex justify-center gap-4 mt-8">
         <button
           className="bg-gray-400 text-white px-6 py-2 rounded disabled:opacity-50"
-          disabled={tournament?.race === 1}
-          onClick={() => showModalMessage("Torna indietro non disponibile per la prima gara")}
+          disabled={tournament.race === 1}
+          onClick={handleRewind}
         >
           ⬅️ Torna indietro
         </button>
         
-        {/* NUOVO PULSANTE AGGIUNTO */}
-        <Button
-          variant="outline"
-          onClick={handleSkipReordering}
-          disabled={allGroupsSaved} // Disabilita se tutti i gruppi sono già salvati
-          className={`bg-red-500 text-white hover:bg-red-600 border-red-700 disabled:opacity-50 ${allGroupsSaved ? "cursor-not-allowed" : ""}`}
-        >
-          🚫 Salta riordino (LAN interrotta)
-        </Button>
-        {/* FINE NUOVO PULSANTE */}
+        {/* --- 🚨 INIZIO FIX 🚨 --- */}
+        {/* Pulsanti visibili SOLO se le gare non sono terminate */}
+        {tournament && tournament.race <= tournament.maxraces && (
+          <>
+            {/* NUOVO PULSANTE AGGIUNTO */}
+            <Button
+              variant="outline"
+              onClick={handleSkipReordering}
+              disabled={allGroupsSaved} // Disabilita se tutti i gruppi sono già salvati
+              className={`bg-red-500 text-white hover:bg-red-600 border-red-700 disabled:opacity-50 ${allGroupsSaved ? "cursor-not-allowed" : ""}`}
+            >
+              🚫 Salta riordino (LAN interrotta)
+            </Button>
+            {/* FINE NUOVO PULSANTE */}
 
-        <Button
-            variant="default"
-            disabled={!allGroupsSaved}
-            className={!allGroupsSaved ? "opacity-50 cursor-not-allowed" : ""}
-            onClick={handleNextAction}
-          >
-            {getNextRaceButtonText()}
-          </Button>
+            <Button
+                variant="default"
+                disabled={!allGroupsSaved}
+                className={!allGroupsSaved ? "opacity-50 cursor-not-allowed" : ""}
+                onClick={handleNextAction} // onClick ora gestisce internamente se il torneo è finito
+              >
+                {getNextRaceButtonText()}
+              </Button>
+          </>
+        )}
+        {/* --- 🚨 FINE FIX 🚨 --- */}
 
       </div>
 

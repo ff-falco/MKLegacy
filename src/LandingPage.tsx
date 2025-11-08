@@ -81,6 +81,8 @@ export default function LandingPage() {
     setShowInfo(true);
     setTimeout(() => setShowInfo(false), 3000);
   };
+
+  
   
 
   

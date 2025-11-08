@@ -21,6 +21,28 @@ export default function TournamentPage() {
   const [newParticipant, setNewParticipant] = useState({ nickname: "", name: "" });
   const [showForm, setShowForm] = useState(false);
 
+  // --- 🚨 1. FUNZIONE MODALE (AGGIUNTA) 🚨 ---
+  // Aggiunta per sostituire alert/confirm
+  const showModalMessage = (message: string, isConfirm: boolean = false): Promise<boolean> => {
+    if (isConfirm) {
+      try {
+        return Promise.resolve(window.confirm(message));
+      } catch (e) {
+        console.warn("window.confirm bloccato.", e);
+        return Promise.resolve(true); // Falla passare in caso di errore
+      }
+    }
+    try {
+      window.alert(message);
+    } catch (e) {
+      console.warn("window.alert bloccato.", e);
+      console.log("Messaggio (fallback):", message);
+    }
+    return Promise.resolve(true);
+  };
+  // --- 🚨 FINE 🚨 ---
+
+
   useEffect(() => {
     if (fromCreate) {
       const stored = localStorage.getItem("tournamentData");
@@ -51,6 +73,11 @@ export default function TournamentPage() {
 
   const totalPlayers = Number(tournament.totalPlayers);
   const slots = Array.from({ length: totalPlayers }, (_, i) => participants[i] ?? null);
+  
+  // --- 🚨 2. CONTROLLO TORNEO PIENO (AGGIUNTO) 🚨 ---
+  const isFull = participants.length >= totalPlayers;
+  // --- 🚨 FINE 🚨 ---
+
 
   // --- FUNZIONE CAMBIA SEEDING ---
   const handleChangeSeeding = (nickname: string, seeding: number) => {
@@ -61,12 +88,47 @@ export default function TournamentPage() {
       .catch((err) => console.error(err));
   };
 
-  // --- FUNZIONE AGGIUNGI PARTECIPANTE ---
-  const handleAddParticipant = () => {
-    if (!newParticipant.name || !newParticipant.nickname) return;
+  // --- FUNZIONE AGGIUNGI PARTECIPANTE (MODIFICATA CON TRIM) ---
+  const handleAddParticipant = async () => {
+    // --- 🚨 INIZIO FIX: TRIM 🚨 ---
+    // 1. Pulisci gli input dagli spazi vuoti
+    const trimmedName = newParticipant.name.trim();
+    const trimmedNickname = newParticipant.nickname.trim();
+
+    // 2. Controlla se (dopo il trim) sono vuoti
+    if (!trimmedName || !trimmedNickname) {
+      await showModalMessage("❌ Nome e Nickname non possono essere vuoti.");
+      return;
+    }
+    // --- 🚨 FINE FIX: TRIM 🚨 ---
+
+    // --- 🚨 CONTROLLI POSTI E NICKNAME 🚨 ---
+    if (isFull) {
+      await showModalMessage("❌ Il torneo è pieno. Non puoi aggiungere altri partecipanti.");
+      return;
+    }
+
+    // --- 🚨 INIZIO FIX: TRIM 🚨 ---
+    // 3. Controlla i duplicati usando i valori puliti (confronta trim vs trim)
+    const nicknameExists = participants.some(
+      (p) => p.nickname.trim().toLowerCase() === trimmedNickname.toLowerCase()
+    );
+    // --- 🚨 FINE FIX: TRIM 🚨 ---
+
+    if (nicknameExists) {
+      await showModalMessage("❌ Esiste già un partecipante con questo nickname. Scegline un altro.");
+      return;
+    }
+    // --- 🚨 FINE 🚨 ---
   
     axios
-      .post(`http://localhost:4000/api/tournament/${tournament.code}/join`, newParticipant)
+      // --- 🚨 INIZIO FIX: TRIM 🚨 ---
+      // 4. Invia i dati puliti (trimmed) al backend
+      .post(`http://localhost:4000/api/tournament/${tournament.code}/join`, {
+        name: trimmedName,
+        nickname: trimmedNickname
+      })
+      // --- 🚨 FINE FIX: TRIM 🚨 ---
       .then(() => {
         // GET per aggiornare i partecipanti
         return axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
@@ -80,52 +142,71 @@ export default function TournamentPage() {
       .catch((err) => console.error(err));
   };
 
-  // --- FUNZIONE AGGIUNGI MOCK PARTECIPANTI ---
-const handleAddMockParticipants = async () => {
-  if (!tournament) return;
+  // --- FUNZIONE AGGIUNGI MOCK PARTECIPANTI (MODIFICATA) ---
+  const handleAddMockParticipants = async () => {
+    if (!tournament) return;
 
-  const totalPlayers = Number(tournament.totalPlayers)-participants.length;
-  const mockParticipants = Array.from({ length: totalPlayers }, (_, i) => ({
-    name: `Giocatore ${i + 1}`,
-    nickname: `nick${i + 1}`,
-    seeding: Math.floor(Math.random() * totalPlayers) + 1,
-  }));
-
-  try {
-    // Aggiungiamo in sequenza tutti i giocatori mock
-    for (const p of mockParticipants) {
-      await axios.post(`http://localhost:4000/api/tournament/${tournament.code}/join`, p);
+    const remainingSlots = Number(tournament.totalPlayers) - participants.length;
+    if (remainingSlots <= 0) {
+      await showModalMessage("Il torneo è già pieno!");
+      return;
     }
 
-    // Poi aggiorniamo i partecipanti dal server
-    const res = await axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
-    setParticipants(res.data.participants ?? []);
-    alert("Giocatori mock aggiunti con successo!");
-  } catch (err) {
-    console.error(err);
-  }
-};
+    const mockParticipants = Array.from({ length: remainingSlots }, (_, i) => ({
+      name: `Giocatore ${participants.length + i + 1}`,
+      nickname: `nick${participants.length + i + 1}`,
+      seeding: null, // Lasciamo che il seeding venga impostato dopo
+    }));
 
-  // --- FUNZIONE RIMUOVI PARTECIPANTE ---
-  const handleRemoveParticipant = (nickname: String) => {
-  axios
-    .post(`http://localhost:4000/api/tournament/${tournament.code}/leave`, { nickname })
-    .then(() => axios.get(`http://localhost:4000/api/tournament/${tournament.code}`))
-    .then((res) => {
+    try {
+      // Aggiungiamo in sequenza tutti i giocatori mock
+      for (const p of mockParticipants) {
+        await axios.post(`http://localhost:4000/api/tournament/${tournament.code}/join`, p);
+      }
+
+      // Poi aggiorniamo i partecipanti dal server
+      const res = await axios.get(`http://localhost:4000/api/tournament/${tournament.code}`);
       setParticipants(res.data.participants ?? []);
-    })
-    .catch((err) => console.error(err));
+      await showModalMessage("Giocatori mock aggiunti con successo!");
+    } catch (err) {
+      console.error(err);
+    }
   };
+
+  // --- FUNZIONE RIMUOVI PARTECIPANTE (MODIFICATA) ---
+  const handleRemoveParticipant = async (nickname: String) => {
+    // Aggiunta conferma
+    const ok = await showModalMessage(`Sei sicuro di voler rimuovere ${nickname}?`, true);
+    if (!ok) return;
+
+    axios
+      .post(`http://localhost:4000/api/tournament/${tournament.code}/leave`, { nickname })
+      .then(() => axios.get(`http://localhost:4000/api/tournament/${tournament.code}`))
+      .then((res) => {
+        setParticipants(res.data.participants ?? []);
+      })
+      .catch((err) => console.error(err));
+  };
+  
   return (
     <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center text-center max-h-[90vh] overflow-hidden">
         <h1 className="text-3xl font-bold mb-2">{tournament.name}</h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 mb-4">
           <strong>Data:</strong> {tournament.date} —{" "}
           <strong>Giocatori previsti:</strong> {tournament.totalPlayers}
-          <strong> — Codice:</strong> {tournament.code}
           <strong> — Numero Gare:</strong> {tournament.maxraces}
         </p>
+
+        {/* --- 🚨 4. CODICE RESO EVIDENTE (MODIFICATO) 🚨 --- */}
+        <div className="mb-6 text-center">
+          <span className="text-sm font-medium text-gray-600 uppercase">Codice Torneo:</span>
+          <span className="ml-2 inline-block bg-blue-100 text-blue-800 text-2xl font-bold px-4 py-1 rounded-full">
+            {tournament.code}
+          </span>
+        </div>
+        {/* --- 🚨 FINE 🚨 --- */}
+
 
         {/* Lista partecipanti */}
         <div className="w-full flex-1 overflow-y-auto border border-gray-200 rounded-xl p-4 mb-6 shadow-inner bg-gray-50">
@@ -196,8 +277,6 @@ const handleAddMockParticipants = async () => {
         </div>
 
         {/* Form per aggiungere partecipante */}
-
-
         {showForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-lg p-6 w-80 space-y-4">
@@ -207,14 +286,16 @@ const handleAddMockParticipants = async () => {
                 placeholder="Nome"
                 value={newParticipant.name}
                 onChange={(e) => setNewParticipant({ ...newParticipant, name: e.target.value })}
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white "
+                // --- 🚨 5. FIX: RIMOSSO text-white (BUG) 🚨 ---
+                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="text"
                 placeholder="Nickname"
                 value={newParticipant.nickname}
                 onChange={(e) => setNewParticipant({ ...newParticipant, nickname: e.target.value })}
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-white "
+                // --- 🚨 5. FIX: RIMOSSO text-white (BUG) 🚨 ---
+                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="flex gap-4 mt-4">
                 <Button variant="default" onClick={handleAddParticipant} className="flex-1">✅ Aggiungi</Button>
@@ -224,56 +305,66 @@ const handleAddMockParticipants = async () => {
           </div>
         )}
 
-        <Button variant="default" onClick={() => setShowForm(true)}>➕ Aggiungi partecipante</Button>
-        <Button
-          variant="secondary"
-          onClick={handleAddMockParticipants}
-          className="mt-2"
-        >
-          🧩 Aggiungi partecipanti di test
-        </Button>
+        {/* --- 🚨 6. BOTTONI AGGIUNTA CONDIZIONALI (MODIFICATO) 🚨 --- */}
+        {!isFull ? (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="default" onClick={() => setShowForm(true)}>➕ Aggiungi partecipante</Button>
+            <Button
+              variant="secondary"
+              onClick={handleAddMockParticipants}
+            >
+              🧩 Aggiungi partecipanti di test
+            </Button>
+          </div>
+        ) : (
+          <p className="text-lg font-semibold text-green-600">✅ Torneo Pieno!</p>
+        )}
+        {/* --- 🚨 FINE 🚨 --- */}
+
+
         <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
-        <Button
-          variant="default"
-          disabled={participants.length < totalPlayers || tournament.started}
-          onClick={() => {
-            const ok = window.confirm("Vuoi andare al pre-torneo?");
-            if (!ok) return;
+          <Button
+            variant="default"
+            disabled={!isFull || tournament.started}
+            onClick={async () => { // Aggiunto async
+              // Modificato per usare showModalMessage
+              const ok = await showModalMessage("Vuoi andare al pre-torneo?", true);
+              if (!ok) return;
 
-            // Aggiorna lo stato nel DB
-            axios
-              .patch(`http://localhost:4000/api/tournament/${tournament.code}/start`)
-              .then(() => {
-                setTournament((prev: any) => ({ ...prev, started: true })); // aggiorna anche lo stato locale
-                navigate(`/pretournament/${tournament.code}`);
-              })
-              .catch((err) => console.error(err));
-          }}
-          className={participants.length < totalPlayers || tournament.started ? "opacity-50 cursor-not-allowed" : ""}
-        >
-          🏁 Avvia torneo
-        </Button>
+              // Aggiorna lo stato nel DB
+              axios
+                .patch(`http://localhost:4000/api/tournament/${tournament.code}/start`)
+                .then(() => {
+                  setTournament((prev: any) => ({ ...prev, started: true })); // aggiorna anche lo stato locale
+                  navigate(`/pretournament/${tournament.code}`);
+                })
+                .catch((err) => console.error(err));
+            }}
+            className={!isFull || tournament.started ? "opacity-50 cursor-not-allowed" : ""}
+          >
+            🏁 Avvia torneo
+          </Button>
 
 
-  <Button
-    variant="destructive"
-    onClick={() => {
-      const ok = window.confirm("Sei sicuro di voler cancellare il torneo? Questa azione non è reversibile.");
-      if (!ok) return;
+          <Button
+            variant="destructive"
+            onClick={async () => { // Aggiunto async
+              // Modificato per usare showModalMessage
+              const ok = await showModalMessage("Sei sicuro di voler cancellare il torneo? Questa azione non è reversibile.", true);
+              if (!ok) return;
 
-      axios
-        .delete(`http://localhost:4000/api/tournament/${tournament.code}`)
-        .then(() => {
-          alert("Torneo cancellato!");
-          window.location.href = "/"; // oppure navigate("/") se usi react-router
-          
-        })
-        .catch((err) => console.error(err));
-    }}
-  >
-    ❌ Cancella torneo
-  </Button>
-</div>
+              axios
+                .delete(`http://localhost:4000/api/tournament/${tournament.code}`)
+                .then(() => {
+                  showModalMessage("Torneo cancellato!");
+                  navigate("/"); // Usiamo navigate
+                })
+                .catch((err) => console.error(err));
+            }}
+          >
+            ❌ Cancella torneo
+          </Button>
+        </div>
       </div>
     </div>
   );
