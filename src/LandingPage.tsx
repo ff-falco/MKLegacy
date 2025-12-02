@@ -2,16 +2,23 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { decodeData } from "./encodedecodemaps"; // Importa la funzione di decodifica
 
-//import { useNavigate } from "react-router-dom";
+// Definisci le interfacce per i dati decodificati per TypeScript
+interface DecodedTier {
+    tiers: { [key: string]: { alt: string, src: string, id: number }[] };
+    charts: number[][]; 
+    visiblePoints: boolean[][];
+    timestamp?: number;
+}
 
 
 export default function LandingPage() {
-  //const navigate = useNavigate();
-
+  
   // Stati modale e form
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<"create" | "resume" | null>(null);
+  const [tierCodeError, setTierCodeError] = useState<string | null>(null); // Nuovo stato per l'errore del codice Tier List
 
   const [formData, setFormData] = useState({
     name: "",
@@ -21,7 +28,7 @@ export default function LandingPage() {
     races: "",
   });
   const [tournamentCode, setTournamentCode] = useState("");
-  const [tierCode, setTierCode] = useState("");
+  const [tierCode, setTierCode] = useState(""); // Usa stringa per textarea
 
   // Tooltip Tier List
   const [showInfo, setShowInfo] = useState(false);
@@ -31,7 +38,7 @@ export default function LandingPage() {
 
   
   // Apertura/chiusura modale
-  const openCreateModal = () => { setModalType("create"); setShowModal(true); };
+  const openCreateModal = () => { setModalType("create"); setShowModal(true); setTierCodeError(null); }; // Reset errore
   const openResumeModal = () => { setModalType("resume"); setShowModal(true); };
   const closeModal = () => {
     setShowModal(false);
@@ -39,6 +46,7 @@ export default function LandingPage() {
     setFormData({ name: "", players: "", stations: "", date: "" , races: ""});
     setTournamentCode("");
     setTierCode("");
+    setTierCodeError(null); // Reset errore
   };
   const navigate = useNavigate();
 
@@ -48,8 +56,7 @@ export default function LandingPage() {
   
     const handleClickOutside = (event: MouseEvent) => {
       if (tooltipRef.current && !tooltipRef.current.contains(event.target as Node)) {
-        // Chiude dopo 3 secondi se è stato cliccato
-        timeout = window.setTimeout(() => setShowInfo(false), 10000);
+        timeout = window.setTimeout(() => setShowInfo(false), 3000); // 3 secondi per chiudere
       }
     };
   
@@ -63,17 +70,18 @@ export default function LandingPage() {
   
   const handleMouseEnter = () => {
     setHovering(true);
+    // Mostra se l'hover dura almeno 500ms
     setTimeout(() => {
       if (hovering) setShowInfo(true);
-    }, 1000);
+    }, 500); 
   };
   
   const handleMouseLeave = () => {
     setHovering(false);
-    // Chiude il tooltip solo se non è stato cliccato
+    // Chiude solo se non è in hover
     setTimeout(() => {
       if (!hovering) setShowInfo(false);
-    }, 500);
+    }, 300); 
   };
   
   // Al click, apre e resta visibile per 3 secondi
@@ -83,7 +91,105 @@ export default function LandingPage() {
   };
   
 
-  
+  const handleCreateTournament = async () => {
+    setTierCodeError(null); // Reset errore ad ogni tentativo
+
+    // 1. Validazione Campi Obbligatori
+    if (
+      !formData.name ||
+      !formData.players ||
+      !formData.stations ||
+      !formData.date ||
+      !formData.races
+    ) {
+      return alert("Per favore, compila tutti i campi obbligatori.");
+    }
+    
+    let decodedTierList: DecodedTier | null = null;
+    let finalTierList: any = null;
+    let standardTierList = "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";
+
+    // 2. Decodifica Codice Tier List (se fornito)
+    if (tierCode.trim()) {
+      decodedTierList = decodeData(tierCode.trim()) as DecodedTier | null;
+      
+      if (!decodedTierList || !decodedTierList.tiers || !decodedTierList.charts) {
+        setTierCodeError("Codice Tier List non valido o Tier List corrotta.");
+        return; 
+      }
+      
+      // 3. Formattazione della Tier List per il backend (Mappe + Probabilità)
+      const probTierOrder = ["Facile", "Normale", "Difficile", "Adlitam", "Goat"];
+      finalTierList = {}; // useremo un oggetto per salvare tiers e probabilità
+
+      // Popola la tierList finale combinando mappe e probabilità
+      probTierOrder.forEach((tierName, index) => {
+          // I tre valori di probabilità per Qualifica, Normale, Finale
+          const probabilities = [
+              decodedTierList!.charts[0][index], // Qualifica
+              decodedTierList!.charts[1][index], // Normale
+              decodedTierList!.charts[2][index]  // Finale
+          ];
+          
+          finalTierList[tierName] = {
+              maps: decodedTierList!.tiers[tierName].map(m => m.alt), // Solo i nomi delle mappe (alt)
+              probabilities: probabilities
+          };
+      });
+      
+      // Aggiungi la categoria "Ban" (con probabilità 0)
+      finalTierList["Ban"] = {
+        maps: decodedTierList!.tiers["Ban"] ? decodedTierList!.tiers["Ban"].map(m => m.alt) : [],
+        probabilities: [0, 0, 0]
+      };
+    }
+
+    // 4. Preparazione dei dati del Torneo
+    const stationsCount = Number(formData.stations);
+    const playersCount = Number(formData.players);
+    const positionsarray = Array.from({ length: stationsCount }, (_, i) => i + 1); // [1, 2, 3, ...]
+
+    const tournamentData = {
+      name: formData.name,
+      date: formData.date,
+      totalPlayers: playersCount,
+      stations: stationsCount,
+      // Se finalTierList è null, si usano le mappe di default (gestione lato server)
+      tierList: finalTierList || {}, 
+      tierCode: tierCode.trim() || null, // Salva il codice originale se presente
+      
+      startingpositions: positionsarray,
+      seriescount: Math.ceil(playersCount / stationsCount),
+      maxraces: Number(formData.races),
+      bannedmaps: [],
+    };
+    
+    // 5. Genera codice e invia all'API
+    const tournamentCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tournament`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: tournamentCode,
+          ...tournamentData
+        })
+      });
+
+      if (!res.ok) throw new Error("Errore nella creazione del torneo");
+
+      const createdTournament = await res.json();
+
+      localStorage.setItem("tournamentData", JSON.stringify(createdTournament));
+      navigate(`/tournament/${createdTournament.code}`, { state: { fromCreate: true } });
+
+    } catch (err) {
+      console.error(err);
+      alert("Errore nella creazione del torneo! Riprova più tardi.");
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-between bg-gradient-to-b from-blue-50 to-white text-gray-800">
@@ -127,7 +233,7 @@ export default function LandingPage() {
       {/* --- MODALE --- */}
       {showModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-lg p-6 w-80 shadow-lg space-y-4">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-lg space-y-4">
             {modalType === "create" ? (
               <>
                 <h3 className="text-lg font-bold text-center">Crea un nuovo torneo</h3>
@@ -172,107 +278,58 @@ export default function LandingPage() {
                 />
 
                 {/* --- Codice Tier List --- */}
-                <div className="relative w-full flex items-center gap-2">
-                  <input
-                    type="text"
-                    maxLength={5}
-                    placeholder="Codice Tier List"
+                <div className="relative w-full">
+                  <div className="flex items-center gap-2 mb-1">
+                    <label className="text-sm font-medium text-gray-700">Codice Tier List (Opzionale)</label>
+                    <div
+                      ref={tooltipRef}
+                      className="relative cursor-pointer text-blue-500 font-bold"
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
+                      onClick={handleClickInfo}
+                    >
+                      i
+                      <AnimatePresence>
+                        {showInfo && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-white border border-gray-300 rounded-md p-3 shadow-lg text-sm z-50 text-left"
+                          >
+                            Per creare una nuova Tier List con la diffoltà delle mappe clicca{" "}
+                            <a
+                              href="/tierlist"
+                              className="text-blue-600 underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Crea Tier List
+                            </a>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                  
+                  {/* TextArea per il codice lungo */}
+                  <textarea
+                    placeholder="Incolla qui il codice Tier List autogenerato (Base64 compresso)..."
                     value={tierCode}
                     onChange={(e) => setTierCode(e.target.value)}
-                    className="flex-1 border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={4} // Aumentato per il codice lungo
+                    className={`w-full border px-3 py-2 rounded-md bg-white text-black focus:outline-none focus:ring-2 ${tierCodeError ? 'border-red-500' : 'focus:ring-blue-500'}`}
                   />
-                  <div
-                    ref={tooltipRef}
-                    className="relative cursor-pointer text-blue-500 font-bold"
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
-                    onClick={handleClickInfo}
-                  >
-                    i
-                    <AnimatePresence>
-                      {showInfo && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-white border border-gray-300 rounded-md p-3 shadow-lg text-sm z-50"
-                        >
-                          Per creare una nuova Tier List con la diffoltà delle mappe clicca{" "}
-                          <a
-                            href="/tierlist"
-                            className="text-blue-600 underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Crea Tier List
-                          </a>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                  {tierCodeError && (
+                    <p className="text-red-500 text-xs mt-1">{tierCodeError}</p>
+                  )}
                 </div>
 
                 {/* Bottoni OK / Cancella */}
                 <div className="flex justify-between gap-4">
                 <Button
                   variant="default"
-                  onClick={async () => {
-                    // Se i campi non sono compilati, non fare nulla
-                    if (
-                      !formData.name ||
-                      !formData.players ||
-                      !formData.stations ||
-                      !formData.date ||
-                      !formData.races
-                    ) {
-                      //evidenzia i campi mancanti di rosso
-                      return alert("Per favore, compila tutti i campi.");
-                      
-                    }
-                    const positionsarray = [];
-                    console.log("Stations:", formData.stations);
-                    for (let i = 1; i < (Number(formData.stations)+1); i++) 
-                      positionsarray.push(i);
-                    const tournamentData = {
-                      name: formData.name,
-                      date: formData.date,
-                      totalPlayers: Number(formData.players),
-                      stations: Number(formData.stations),
-                      tiercode: tierCode,
-                      startingpositions: positionsarray,
-                      seriescount: Math.ceil(Number(formData.players) / Number(formData.stations)),
-                      maxraces: Number(formData.races),
-                    };
-              
-                    // Genera un codice univoco per il torneo
-                    const tournamentCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    
-                    try {
-                      // Chiamata POST all'API per creare il torneo
-                      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tournament`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          code: tournamentCode,
-                          ...tournamentData
-                        })
-                      });
-              
-                      if (!res.ok) throw new Error("Errore nella creazione del torneo");
-              
-                      const createdTournament = await res.json();
-              
-                      // Salva i dati localmente per usarli nella tournament page
-                      localStorage.setItem("tournamentData", JSON.stringify(createdTournament));
-              
-                      // Reindirizza alla tournament page
-                      navigate(`/tournament/${createdTournament.code}`, { state: { fromCreate: true } });
-              
-                    } catch (err) {
-                      console.error(err);
-                      alert("Errore nella creazione del torneo!");
-                    }
-                  }}
+                  onClick={handleCreateTournament} // Usa il gestore centralizzato
                   className="flex-1"
                   >
                   OK

@@ -61,6 +61,15 @@ const TournamentSchema = new mongoose.Schema({
   seriesThreshold:{ type: Number, default: 0 },
   maxraces: { type: Number, default: 2 },
   finaleincrement: { type: [Number], default: [] },
+  tierList: [
+    {
+      tiername: { type: String, required: true },
+      num1: { type: Number, required: true },
+      num2: { type: Number, required: true },
+      num3: { type: Number, required: true },
+      stringArray: { type: [String], default: [] }
+    }
+  ],
 });
 
 export default mongoose.model("Tournament", TournamentSchema);

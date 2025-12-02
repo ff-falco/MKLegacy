@@ -51,7 +51,7 @@ mongoose
 // ➕ Creare un nuovo torneo
 app.post("/api/tournament", async (req, res) => {
   try {
-    const { code, name, date, totalPlayers, stations, tiercode, startingpositions, seriescount } = req.body;
+    const { code, name, date, totalPlayers, stations, tiercode, startingpositions, seriescount, bannedmaps, tierList } = req.body;
     console.log("Ricevuti dati torneo:", { code, name, date, totalPlayers, stations, tiercode, startingpositions });
     console.log("Creazione torneo con posizioni iniziali:", startingpositions);
     const existing = await Tournament.findOne({ code });
@@ -69,6 +69,8 @@ app.post("/api/tournament", async (req, res) => {
       stationsPositions: startingpositions || [],
       seriesCount: seriescount || 0,
       maxraces: req.body.maxraces || 2,
+      bannedmaps: bannedmaps || [],
+      tierList: tierList || [],
     });
 
     res.json(newTournament);
@@ -729,6 +731,8 @@ app.post("/api/tournament/:code/leave", async (req, res) => {
 
   res.json(t.participants); // ritorna lista aggiornata
 });
+
+
 
 
 
