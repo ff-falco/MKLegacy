@@ -117,7 +117,7 @@ const compareImageItems = (a: ImageItem, b: ImageItem): number => {
   // ⭐ FUNZIONE AGGIORNATA CON ORDINAMENTO PER NOME MAPPA DOPO IL TRATTINO (Questa parte era già corretta)
   const fetchGitHubImages = async (): Promise<ImageItem[]> => {
     const response = await fetch(
-      "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo"
+      "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo2"
     );
     const files = await response.json();
 
@@ -484,7 +484,7 @@ const compareImageItems = (a: ImageItem, b: ImageItem): number => {
               readOnly
               value={uniqueCode}
               rows={6}
-              className="w-full p-2 border rounded text-xs text-gray-800 font-mono resize-none overflow-y-scroll"
+              className="w-full p-2 border rounded text-xs text-gray-800 font-mono resize-none overflow-y-scroll bg-white text-black"
               onFocus={(e) => e.target.select()}
               style={{ overflowWrap: 'break-word' }}
             />
