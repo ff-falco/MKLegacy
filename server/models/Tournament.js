@@ -53,7 +53,6 @@ const TournamentSchema = new mongoose.Schema({
   started: { type: Boolean, default: false },
   reviewed: { type: Boolean, default: false },
   race: { type: Number, default: 1 },
-  bannedmaps: { type: [String], default: [] },
   temporaryResults: { type: [TemporaryResultSchema], default: [] },
   stationsPositions:{type: [Number], default: []},
   seriesCount: { type: Number, default: 0 },
@@ -63,13 +62,15 @@ const TournamentSchema = new mongoose.Schema({
   finaleincrement: { type: [Number], default: [] },
   tierList: [
     {
-      tiername: { type: String, required: true },
-      num1: { type: Number, required: true },
-      num2: { type: Number, required: true },
-      num3: { type: Number, required: true },
-      stringArray: { type: [String], default: [] }
+      tierName: { type: String, required: true },
+      probQualifica: { type: Number, required: true },
+      probInterna: { type: Number, required: true },
+      probFinale: { type: Number, required: true },
+      mapNames: { type: [String], default: [] }
     }
   ],
+  tierCode: { type: String, default: "" },
+  temporaryMaps: { type: [String], default: [] },
 });
 
 export default mongoose.model("Tournament", TournamentSchema);

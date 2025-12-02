@@ -4,6 +4,25 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
+// Definizione per le immagini di GitHub
+interface MapImageItem {
+  id: number;
+  src: string;
+  alt?: string; 
+}
+
+// Interfaccia per il formato Tier List corretto (Array di Oggetti)
+interface TierMatrixRow {
+  tierName: string;
+  probQualifica: number;
+  probInterna: number;
+  probFinale: number;
+  mapNames: string[];
+}
+
+// URL dell'API GitHub
+const GITHUB_MAPS_URL = "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo2";
+
 
 export default function PreTournamentPage() {
   const { code } = useParams<{ code: string }>();
@@ -11,6 +30,10 @@ export default function PreTournamentPage() {
 
   const [tournament, setTournament] = useState<any>(null);
   const [groups, setGroups] = useState<any[][]>([]);
+
+  // ⭐ NUOVO STATO: Memorizza tutte le immagini di GitHub
+  const [mapImages, setMapImages] = useState<MapImageItem[]>([]);
+  const [mapImagesLoading, setMapImagesLoading] = useState(true);
 
   // 🔹 nuovi stati per le caselle numeriche
   const [incremento, setIncremento] = useState<number>(1);
@@ -23,9 +46,58 @@ export default function PreTournamentPage() {
   const MAX_INCREMENTO = Infinity;
   const MIN_SOGLIA = 0;
 
+  // Funzione per estrarre la parte del nome che segue il trattino (usata per ordinamento)
+  const getNamePart = (alt: string): string => {
+    if (!alt) return '';
+    const nameWithoutExt = alt.substring(0, alt.lastIndexOf('.'));
+    const separatorIndex = nameWithoutExt.indexOf('-');
+    if (separatorIndex !== -1) {
+      return nameWithoutExt.substring(separatorIndex + 1).trim();
+    }
+    return nameWithoutExt; 
+  };
+
+  const compareImageItems = (a: MapImageItem, b: MapImageItem): number => {
+    if (!a.alt || !b.alt) return 0;
+    const nameA = getNamePart(a.alt);
+    const nameB = getNamePart(b.alt);
+    return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+  };
+  
+  // ⭐ NUOVA FUNZIONE: Fetch delle immagini da GitHub
+  const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
+    try {
+      const response = await fetch(GITHUB_MAPS_URL);
+      const files = await response.json();
+
+      if (!Array.isArray(files)) return [];
+
+      const images: MapImageItem[] = files
+        .filter((f: any) => f.type === "file" && f.name.match(/\.(png|jpg|jpeg|gif)$/i))
+        .map((f: any, index: number) => ({
+          id: index + 1,
+          src: f.download_url,
+          alt: f.name, // Nome file completo (es. "1-Mappa.png")
+        }));
+
+      return images.sort(compareImageItems);
+    } catch (e) {
+      console.error("Errore nel fetching delle immagini di GitHub:", e);
+      return [];
+    }
+  };
+
+
   useEffect(() => {
     if (!code) return;
 
+    // 1. Fetch delle immagini
+    fetchGitHubImages().then(imgs => {
+        setMapImages(imgs);
+        setMapImagesLoading(false);
+    });
+
+    // 2. Fetch del torneo
     axios
       .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
       .then((res) => {
@@ -36,16 +108,13 @@ export default function PreTournamentPage() {
           const distribuiti = createGroups(t.participants, t.stations);
           setGroups(distribuiti);
         }
-        //Inizializza il multipler in base al numero di gruppi
-        setMultiplier([]);
-        let multipler = [];
+        
+        // Inizializza il multipler in base al numero di gruppi
+        let initialMultiplier = [];
         for (let i=0; i< Math.ceil(t.participants.length / t.stations); i++){
-          console.log("PUSH");
-          multipler.push(1);
+          initialMultiplier.push(1);
         }
-        setMultiplier(multipler);
-        console.log("MULTIPLER:");
-        console.log(multipler);
+        setMultiplier(initialMultiplier);
 
         if (!t.started) {
           navigate(`/tournament/${code}`);
@@ -73,6 +142,115 @@ export default function PreTournamentPage() {
   const calcolapunteggi = (index: number, column:number, incremento:number, maxpartecipants:number, seriescount:number) => {
     return maxpartecipants - (index) + (seriescount-column-1) * incremento;
   }
+  
+  // ⭐ FUNZIONE PER MOSTRARE L'ANTEPRIMA DELLA TIER LIST (CORRETTA PER L'ARRAY)
+  const renderTierListPreview = () => {
+    // Castiamo a TierMatrixRow[] per sicurezza, sappiamo che è un array
+    const tierList: TierMatrixRow[] = tournament?.tierList || [];
+    
+    if (mapImagesLoading) {
+         return <p className="text-gray-500 italic text-center">Caricamento miniature mappe...</p>
+    }
+    
+    if (!tierList || tierList.length === 0) {
+        return (
+            <p className="text-gray-500 italic text-center">
+                Schema Tier List non disponibile. Verrà usata la lista mappe completa.
+            </p>
+        );
+    }
+
+    // Mappa per associare il nome del file all'oggetto immagine completo
+    const imageLookup: Record<string, MapImageItem> = mapImages.reduce((acc, img) => {
+      // ⭐ L'errore è corretto qui: TypeScript ora sa che 'acc' è un oggetto 
+      // indicizzabile con stringhe (Record<string, MapImageItem>).
+      if (img.alt) { 
+          acc[img.alt] = img; 
+      }
+      return acc;
+  // ⭐ CORREZIONE: Inizializza l'accumulatore come un oggetto vuoto del tipo atteso.
+  }, {} as Record<string, MapImageItem>);
+    
+    const phaseNames = ["Qualifica", "Gara Interna", "Finale"];
+
+    // Calcolo del totale delle mappe (iterando sull'Array)
+    const totalMaps = tierList.reduce((sum, tier) => sum + (tier?.mapNames?.length ?? 0), 0);
+
+    return (
+        <div className="w-full space-y-4">
+            <table className="min-w-full bg-white border border-gray-300 rounded-lg shadow-sm">
+                <thead>
+                    <tr className="bg-gray-100">
+                        <th className="py-1 px-2 text-left text-sm font-semibold text-gray-600 border-b">Tier</th>
+                        <th className="py-1 px-2 text-center text-sm font-semibold text-gray-600 border-b">Mappe ({totalMaps})</th>
+                        {phaseNames.map((name, idx) => (
+                            <th key={idx} className="py-1 px-2 text-center text-sm font-semibold text-gray-600 border-b">{name} (Probabilità)</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {/* ITERAZIONE CORRETTA SUGLI ELEMENTI DELL'ARRAY */}
+                    {tierList.map((tier, index) => {
+                        
+                        // Fallback e accesso ai campi diretti
+                        const maps = tier.mapNames || [];
+                        const probabilities = [tier.probQualifica, tier.probInterna, tier.probFinale];
+                        
+                        // Determina lo stile
+                        let tierColor = 'text-gray-900';
+                        if (['Goat', 'Adlitam', 'Difficile'].includes(tier.tierName)) tierColor = 'text-red-700 font-bold';
+                        if (['Facile'].includes(tier.tierName)) tierColor = 'text-green-700 font-bold';
+                        if (tier.tierName === 'Ban') tierColor = 'text-gray-500 italic';
+
+                        return (
+                            <tr key={index} className="border-b hover:bg-gray-50 align-top">
+                                <td className={`py-2 px-4 text-sm font-medium ${tierColor}`}>{tier.tierName}</td>
+                                
+                                <td className="py-2 px-4 text-sm text-gray-700">
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                    {maps.length > 0 
+                                        ? maps.map((mapName: string) => {
+                                            const mapItem = imageLookup[mapName];
+                                            
+                                            // Se l'immagine è stata trovata, mostra la miniatura
+                                            if (mapItem) {
+                                                return (
+                                                    <img
+                                                        key={mapName}
+                                                        src={mapItem.src}
+                                                        alt={getNamePart(mapItem.alt!)}
+                                                        title={getNamePart(mapItem.alt!)}
+                                                        className="w-14 h-12 object-cover rounded-md shadow-sm"
+                                                    />
+                                                );
+                                            }
+                                            // Altrimenti, mostra il nome testuale
+                                            return (
+                                                <span key={mapName} className="text-xs bg-gray-100 p-1 rounded">
+                                                    {getNamePart(mapName)}
+                                                </span>
+                                            );
+                                        })
+                                        : <span className="italic text-gray-400">Nessuna mappa</span>
+                                    }
+                                    </div>
+                                </td>
+                                
+                                {probabilities.map((prob: number, idx: number) => (
+                                    <td key={idx} className="py-2 px-4 text-center text-sm">
+                                        {prob}
+                                    </td>
+                                ))}
+                            </tr>
+                        );
+                    })}
+                </tbody>
+            </table>
+        </div>
+    );
+  };
+  // ⭐ FINE FUNZIONE ANTEPRIMA TIER LIST
+
 
   if (!tournament) {
     return (
@@ -165,10 +343,8 @@ export default function PreTournamentPage() {
 
 
 
-
-
 {/* 🔹 Riga aggiuntiva allineata alle colonne dei partecipanti */}
-<div className="bg-white rounded-2xl shadow-md p-4 border border-gray-200">
+<div className="bg-white rounded-2xl shadow-md p-4 border border-gray-200 w-full max-w-[1400px]">
 <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">
     Configurazione Moltiplicatore Risultati Finali
   </h2>
@@ -233,45 +409,18 @@ export default function PreTournamentPage() {
               
               newMultiplier[colIndex] = newValue;
 
-              // ✅ CORREZIONE 1: Chiama setMultiplier solo una volta,
+              // ✅ Chiama setMultiplier solo una volta,
               // dopo aver determinato il 'newValue'.
               setMultiplier(newMultiplier);
             }}
             
-            // ✅ CORREZIONE 2: Cambiato 'text-white' in 'text-gray-900'.
-            // Il tuo input era su uno sfondo 'bg-gray-50' (quasi bianco),
-            // quindi 'text-white' rendeva il numero digitato invisibile.
+            // ✅ Cambiato 'text-white' in 'text-gray-900'.
             className="bg-white text-black w-40 text-center border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
       </div>
     ))}
   </div>
 </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
       {/* 🔹 Sezione centrale con i due input */}
@@ -321,7 +470,16 @@ export default function PreTournamentPage() {
 
 
       </div>
-
+      {/* ⭐ SEZIONE ANTEPRIMA TIER LIST ⭐ */}
+      <div className="w-full max-w-4xl mb-10">
+          <h2 className="text-2xl font-bold text-center text-purple-700 mb-4">
+              Schema Tier List Applicato
+          </h2>
+          <div className="bg-white rounded-2xl shadow-xl p-6 border border-purple-200">
+              {renderTierListPreview()}
+          </div>
+      </div>
+      {/* ⭐ FINE SEZIONE ANTEPRIMA TIER LIST ⭐ */}
       {/* 🔹 Pulsanti di azione */}
       <div className="flex gap-4">
         <Button

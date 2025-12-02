@@ -2,24 +2,15 @@
 import React, { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { encodeData, decodeData } from './encodedecodemaps'; 
+import type { TierlistPayload, ImageItem } from './types';
 
 // Definizione dei tipi
 // ⭐ MODIFICATO: Inversione di Adlitam e Goat
 type TierName = "Goat" | "Difficile" | "Normale" | "Facile" | "Ban" | "Adlitam";
 
-interface ImageItem {
-  id: number;
-  src: string;
-  alt?: string; 
-}
 
 // Interfaccia per il payload decodificato
-interface TierlistPayload {
-  tiers: Record<TierName, ImageItem[]>;
-  charts: number[][]; 
-  visiblePoints: boolean[][];
-  timestamp?: number; // Aggiunto per compatibilità con il salvataggio
-}
+
 
 
 export default function TierListPage() {
@@ -29,10 +20,12 @@ export default function TierListPage() {
   const pointNames = ["👶🏼", "😐", "😡", "🐐", "👹"];
   const chartNames = ["Qualifica", "Normale", "Finale"];
 
+
   const [charts, setCharts] = useState([
-    [3, 2, 4, 1, 0], 
-    [1, 3, 2, 4, 0],
-    [2, 4, 3, 1, 0],
+    //                  F  N  D  G  A
+    [3, 2, 4, 0, 1], // ⭐ QUI LA CORREZIONE: Invertiti 1 e 0 (vecchi valori di Adlitam e Goat)
+    [1, 3, 2, 0, 1], // ⭐ Assicurati che tutti gli array siano coerenti
+    [2, 4, 3, 0, 1], // ⭐
   ]);
 
   const [visiblePoints, setVisiblePoints] = useState([

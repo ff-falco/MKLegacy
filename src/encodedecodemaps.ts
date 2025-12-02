@@ -1,64 +1,100 @@
 import pako from 'pako';
+import type { TierlistPayload } from './types'; // ⭐ CORREZIONE QUI
 
-// Tipi base per il payload
-interface TierlistPayload {
-  tiers: any;
-  charts: number[][];
-  visiblePoints: boolean[][];
-  timestamp?: number;
+
+// ⭐ INTERFACCIA PER IL FORMATO DI OUTPUT RICHIESTO
+interface TierMatrixRow {
+  tierName: string;
+  probQualifica: number;
+  probInterna: number;
+  probFinale: number;
+  mapNames: string[];
 }
 
-/**
- * Codifica il payload JSON completo in una stringa compressa Base64.
- * @param payload L'oggetto stato completo da codificare.
- * @returns Il codice Tier List autosufficiente.
- */
+// --- FUNZIONI DI BASE (OMESSE PER BREVITÀ MA DA MANTENERE) ---
+
 export const encodeData = (payload: TierlistPayload): string => {
-  try {
-    const jsonString = JSON.stringify(payload);
-    
-    // 1. Compressione Gzip (restituisce Uint8Array)
-    const compressed_array = pako.deflate(jsonString); 
-    
-    // 2. Conversione Uint8Array a stringa binaria (richiesto da btoa)
-    let binary_string = '';
-    const len = compressed_array.length;
-    for (let i = 0; i < len; i++) {
-        binary_string += String.fromCharCode(compressed_array[i]); 
+  // ... (La tua implementazione esistente per Pako/Base64)
+    try {
+        const jsonString = JSON.stringify(payload);
+        const compressed_array = pako.deflate(jsonString); 
+        let binary_string = '';
+        const len = compressed_array.length;
+        for (let i = 0; i < len; i++) {
+            binary_string += String.fromCharCode(compressed_array[i]); 
+        }
+        return btoa(binary_string);
+    } catch(e) {
+        console.error("Errore di codifica Pako/Base64:", e);
+        return "ENCODING_ERROR";
     }
-    
-    // 3. Codifica Base64
-    return btoa(binary_string);
-    
-  } catch(e) {
-    console.error("Errore di codifica Pako/Base64:", e);
-    return "ENCODING_ERROR";
-  }
 };
 
-/**
- * Decodifica una stringa Base64 compressa per ricostruire il payload JSON originale.
- * @param encodedString Il codice Tier List.
- * @returns L'oggetto payload ricostruito o null.
- */
 export const decodeData = (encodedString: string): TierlistPayload | null => {
-  try {
-    // 1. Decodifica Base64 in stringa binaria
-    const binary_string = atob(encodedString);
-    
-    // 2. Conversione stringa binaria a Uint8Array (richiesto da Pako.inflate)
-    const len = binary_string.length;
-    const compressed_array = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        compressed_array[i] = binary_string.charCodeAt(i); 
+    // ... (La tua implementazione esistente per Base64/Pako)
+    try {
+        const binary_string = atob(encodedString);
+        const len = binary_string.length;
+        const compressed_array = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            compressed_array[i] = binary_string.charCodeAt(i); 
+        }
+        const jsonString = pako.inflate(compressed_array, { to: 'string' });
+        return JSON.parse(jsonString);
+    } catch (error) {
+        return null; 
     }
+};
+
+// --- ⭐ NUOVA FUNZIONE DI RICOSTRUZIONE DELLA MATRICE ⭐ ---
+
+/**
+ * Decodifica il codice Tier List e lo trasforma nel vettore di oggetti richiesto.
+ * @param encodedCode Il codice Tier List (stringa Base64 compressa).
+ * @returns Un vettore di oggetti con Nome Tier, 3 Probabilità e lista delle Mappe.
+ */
+export const reconstructTierMatrix = (encodedCode: string): TierMatrixRow[] | null => {
+    const payload = decodeData(encodedCode);
+
+    if (!payload || !payload.tiers || !payload.charts) {
+        return null; // Decodifica fallita
+    }
+
+    // Ordine dei punti nei grafici (essenziale per mappare gli indici)
+    const probTierOrder: string[] = ["Facile", "Normale", "Difficile", "Goat", "Adlitam"];
+    const finalMatrix: TierMatrixRow[] = [];
+
+    // 1. Processa le categorie con punti di probabilità
+    probTierOrder.forEach((tierName, index) => {
+        const mapsInTier = payload.tiers[tierName] || [];
+
+        // Estrai le probabilità dalle righe di charts (charts[0]=Qualifica, charts[1]=Interna, charts[2]=Finale)
+        const probQualifica = payload.charts[0]?.[index] || 0;
+        const probInterna = payload.charts[1]?.[index] || 0;
+        const probFinale = payload.charts[2]?.[index] || 0;
+        
+        // Costruisci l'oggetto per questa Tier
+        finalMatrix.push({
+            tierName: tierName,
+            probQualifica: probQualifica,
+            probInterna: probInterna,
+            probFinale: probFinale,
+            mapNames: mapsInTier.map(item => item.alt || '') // Ritorna solo i nomi
+        });
+    });
+
+    // 2. Processa la categoria "Ban" separatamente (ha probabilità 0)
+    const banMaps = payload.tiers["Ban"] || [];
+    finalMatrix.push({
+        tierName: "Ban",
+        probQualifica: 0,
+        probInterna: 0,
+        probFinale: 0,
+        mapNames: banMaps.map(item => item.alt || '')
+    });
     
-    // 3. Decompressione Gzip (restituisce stringa)
-    const jsonString = pako.inflate(compressed_array, { to: 'string' });
-    
-    // 4. Deserializzazione JSON
-    return JSON.parse(jsonString);
-  } catch (error) {
-    return null; 
-  }
+    return finalMatrix;
+};
+export const decodeAsObject = (encodedString: string): TierlistPayload | null => {
+  return decodeData(encodedString);
 };
