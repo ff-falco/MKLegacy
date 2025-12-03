@@ -504,7 +504,17 @@ export default function RaceManagerPage() {
   // ⭐ FUNZIONE PER FETCH DELLE IMMAGINI
   const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
     try {
-      const response = await fetch(GITHUB_MAPS_URL);
+      const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
+    
+      let headers: Record<string, string> = {}; // Inizializza come oggetto vuoto (valido)
+
+      if (githubToken) {
+          // Aggiunge l'intestazione solo se il token esiste ed è una stringa non vuota
+          headers = {
+              'Authorization': `token ${githubToken}`
+          };
+      }
+      const response = await fetch(GITHUB_MAPS_URL, { headers });
       const files = await response.json();
 
       if (!Array.isArray(files)) return [];

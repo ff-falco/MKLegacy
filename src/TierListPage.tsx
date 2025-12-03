@@ -109,8 +109,20 @@ const compareImageItems = (a: ImageItem, b: ImageItem): number => {
 
   // ⭐ FUNZIONE AGGIORNATA CON ORDINAMENTO PER NOME MAPPA DOPO IL TRATTINO (Questa parte era già corretta)
   const fetchGitHubImages = async (): Promise<ImageItem[]> => {
+
+    const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
+    
+    let headers: Record<string, string> = {}; // Inizializza come oggetto vuoto (valido)
+
+    if (githubToken) {
+        // Aggiunge l'intestazione solo se il token esiste ed è una stringa non vuota
+        headers = {
+            'Authorization': `token ${githubToken}`
+        };
+    }
+
     const response = await fetch(
-      "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo2"
+      "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo2", { headers }
     );
     const files = await response.json();
 
