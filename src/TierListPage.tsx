@@ -287,10 +287,10 @@ const fetchGitHubImages = async (): Promise<ImageItem[]> => {
 
       <div className="flex flex-col items-center justify-start w-full px-4 sm:px-6 lg:px-10 py-6 flex-grow">
         <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-purple-700 text-center mb-8 leading-tight">
-          🏅 Tier List Maker
+          🏅 MK Legacy Tier List Maker
         </h1>
         <p className="text-gray-600 text-xl text-center max-w-3xl mb-10">
-          Il codice generato **contiene tutti i dati codificati e compressi** per ricostruire la tua Tier List in qualsiasi momento!
+          Il codice generato contiene tutti i dati per ricostruire la tua Tier List in qualsiasi momento!
         </p>
 
         {/* --- SEZIONE CARICAMENTO CODICE --- */}

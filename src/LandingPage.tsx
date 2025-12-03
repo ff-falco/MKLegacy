@@ -199,7 +199,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-between bg-gradient-to-b from-blue-50 to-white text-gray-800">
       <header className="w-full py-6 shadow-sm bg-white/70 backdrop-blur-sm">
-        <h1 className="text-3xl font-bold text-center">TorneoMaker</h1>
+        <h1 className="text-3xl font-bold text-center">MK Legacy Tournament Maker</h1>
       </header>
 
       <main className="flex flex-col items-center text-center px-6 mt-10 flex-grow">
@@ -232,7 +232,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="py-4 text-sm text-gray-500">
-        © {new Date().getFullYear()} TorneoMaker — Tutti i diritti riservati
+        © {new Date().getFullYear()} MK Legacy — Tutti i diritti riservati
       </footer>
 
       {/* --- MODALE --- */}
