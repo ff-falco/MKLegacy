@@ -502,36 +502,39 @@ export default function RaceManagerPage() {
 
 
   // ⭐ FUNZIONE PER FETCH DELLE IMMAGINI
+  const modules = import.meta.glob('/Mappecontorneo2/*.{png,jpg,jpeg,gif}', { eager: true });
+
   const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
-    try {
-      const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
-    
-      let headers: Record<string, string> = {}; // Inizializza come oggetto vuoto (valido)
-
-      if (githubToken) {
-          // Aggiunge l'intestazione solo se il token esiste ed è una stringa non vuota
-          headers = {
-              'Authorization': `token ${githubToken}`
-          };
+      
+      // Rimuovi la logica del token, fetch e gestione errori 403/limiti di frequenza
+  
+      try {
+          // La variabile 'files' è ora l'oggetto ritornato da import.meta.glob
+          const files = modules; 
+  
+          // 1. Mappa i risultati di import.meta.glob nella struttura MapImageItem[]
+          const images: MapImageItem[] = Object.keys(files)
+              .map((path, index) => {
+                  // 'path' è l'URL pubblico della risorsa, es: "/Mappecontorneo2/1-Mappa.png"
+                  
+                  // Estrai il nome del file dal percorso per usarlo come 'alt'
+                  const filename = path.split('/').pop() || '';
+                  
+                  return {
+                      id: index + 1,
+                      src: path,      // Il percorso (URL) per il browser
+                      alt: filename,  // Il nome del file
+                  } as MapImageItem; // Casting per garantire il tipo MapImageItem
+              });
+  
+          // 2. Ritorna l'array ordinato, come facevi con la risposta GitHub
+          return images.sort((a, b) => getNamePart(a.alt).localeCompare(getNamePart(b.alt)));
+          
+      } catch (e) {
+          // La gestione degli errori è semplificata, dato che non ci sono errori di rete
+          console.error("Errore nel caricamento delle immagini locali:", e);
+          return [];
       }
-      const response = await fetch(GITHUB_MAPS_URL, { headers });
-      const files = await response.json();
-
-      if (!Array.isArray(files)) return [];
-
-      const images: MapImageItem[] = files
-        .filter((f: any) => f.type === "file" && f.name.match(/\.(png|jpg|jpeg|gif)$/i))
-        .map((f: any, index: number) => ({
-          id: index + 1,
-          src: f.download_url,
-          alt: f.name as string, 
-        }));
-
-      return images.sort((a, b) => getNamePart(a.alt).localeCompare(getNamePart(b.alt)));
-    } catch (e) {
-      console.error("Errore nel fetching delle immagini di GitHub:", e);
-      return [];
-    }
   };
 
 

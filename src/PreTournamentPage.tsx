@@ -65,37 +65,43 @@ export default function PreTournamentPage() {
   };
   
   // ⭐ NUOVA FUNZIONE: Fetch delle immagini da GitHub
-  const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
+// ⭐ VARIABILE LOCALE: Usa import.meta.glob di Vite per caricare i file.
+// Questa costante deve essere definita nello stesso scope della funzione,
+// preferibilmente all'inizio del file, in uno scope globale o importata.
+const modules = import.meta.glob('/Mappecontorneo2/*.{png,jpg,jpeg,gif}', { eager: true });
+
+const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
     try {
-      const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
-    
-      let headers: Record<string, string> = {}; // Inizializza come oggetto vuoto (valido)
+        // La logica del token, degli headers e del fetch API GitHub è stata rimossa.
 
-      if (githubToken) {
-          // Aggiunge l'intestazione solo se il token esiste ed è una stringa non vuota
-          headers = {
-              'Authorization': `token ${githubToken}`
-          };
-      }
-      const response = await fetch(GITHUB_MAPS_URL, { headers });
-      const files = await response.json();
+        // La variabile 'files' è ora l'oggetto ritornato da import.meta.glob.
+        const files = modules; 
 
-      if (!Array.isArray(files)) return [];
+        // 1. Mappa i risultati di import.meta.glob nella struttura MapImageItem[]
+        const images: MapImageItem[] = Object.keys(files)
+            .map((path, index) => {
+                // 'path' è l'URL pubblico della risorsa, ad esempio: "/Mappecontorneo2/1-Mappa.png"
+                
+                // Estrai il nome del file dal percorso per usarlo come 'alt'
+                const filename = path.split('/').pop() || '';
+                
+                return {
+                    id: index + 1,
+                    src: path,      // Il percorso (URL) per il browser
+                    alt: filename,  // Il nome del file
+                } as MapImageItem; // Casting per garantire il tipo MapImageItem
+            });
 
-      const images: MapImageItem[] = files
-        .filter((f: any) => f.type === "file" && f.name.match(/\.(png|jpg|jpeg|gif)$/i))
-        .map((f: any, index: number) => ({
-          id: index + 1,
-          src: f.download_url,
-          alt: f.name, // Nome file completo (es. "1-Mappa.png")
-        }));
-
-      return images.sort(compareImageItems);
+        // 2. Ritorna l'array ordinato, come facevi con la risposta GitHub
+        // (Assumendo che 'compareImageItems' sia disponibile o che tu stia usando una funzione inline).
+        return images.sort(compareImageItems); 
+        
     } catch (e) {
-      console.error("Errore nel fetching delle immagini di GitHub:", e);
-      return [];
+        // Gestione errori per problemi di caricamento locale (es. percorso sbagliato)
+        console.error("Errore nel caricamento delle immagini locali:", e);
+        return [];
     }
-  };
+};
 
 
   useEffect(() => {

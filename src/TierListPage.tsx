@@ -108,37 +108,38 @@ const compareImageItems = (a: ImageItem, b: ImageItem): number => {
 };
 
   // ⭐ FUNZIONE AGGIORNATA CON ORDINAMENTO PER NOME MAPPA DOPO IL TRATTINO (Questa parte era già corretta)
-  const fetchGitHubImages = async (): Promise<ImageItem[]> => {
+const modules = import.meta.glob('/Mappecontorneo2/*.{png,jpg,jpeg,gif}', { eager: true });
 
-    const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
+// La funzione può rimanere 'async' per coerenza con il codice chiamante,
+// anche se non esegue più un'operazione asincrona complessa (fetch).
+const fetchGitHubImages = async (): Promise<ImageItem[]> => {
     
-    let headers: Record<string, string> = {}; // Inizializza come oggetto vuoto (valido)
+    // Non è più necessario recuperare il token GitHub.
+    // const githubToken = import.meta.env.VITE_GITHUB_TOKEN; 
+    // ...
 
-    if (githubToken) {
-        // Aggiunge l'intestazione solo se il token esiste ed è una stringa non vuota
-        headers = {
-            'Authorization': `token ${githubToken}`
+    // 1. Mappa i risultati di import.meta.glob nella struttura ImageItem[]
+    const images: ImageItem[] = Object.keys(modules)
+      .map((path, index) => {
+        // 'path' sarà l'URL pubblico della risorsa, ad esempio: "/Mappecontorneo2/1-Pista Giungla.png"
+        
+        // Estrai il nome del file dal percorso per usarlo come 'alt'
+        const filename = path.split('/').pop() || '';
+          
+        return {
+          id: index + 1,
+          src: path,      // Il percorso (URL) per il browser
+          alt: filename,  // Il nome del file
         };
-    }
+      });
 
-    const response = await fetch(
-      "https://api.github.com/repos/ff-falco/MKLegacy/contents/Mappecontorneo2", { headers }
-    );
-    const files = await response.json();
-
-    const images: ImageItem[] = files
-      .filter((f: any) => f.type === "file" && f.name.match(/\.(png|jpg|jpeg|gif)$/i))
-      .map((f: any, index: number) => ({
-        id: index + 1,
-        src: f.download_url,
-        alt: f.name, // Esempio: "1-Pista Giungla.png"
-      }));
-
-    // --- Ordinamento per nome dopo il trattino ---
+    // 2. Ritorna l'array ordinato
     return images.sort(compareImageItems);
 
     };
+    
   useEffect(() => {
+    // Il codice chiamante rimane invariato:
     fetchGitHubImages().then((imgs) => setAvailable(imgs));
   }, []);
 
