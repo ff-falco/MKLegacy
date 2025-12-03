@@ -482,6 +482,20 @@ export default function PreTournamentPage() {
       {/* ⭐ FINE SEZIONE ANTEPRIMA TIER LIST ⭐ */}
       {/* 🔹 Pulsanti di azione */}
       <div className="flex gap-4">
+        
+      <Button
+          variant="destructive"
+          onClick={() => {
+            const ok = window.confirm("Vuoi davvero cancellare questo torneo?");
+            if (!ok) return;
+            axios.delete(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`).then(() => {
+              navigate("/");
+            });
+          }}
+        >
+          ❌ Cancella torneo
+        </Button>
+
         <Button
           variant="default"
           onClick={() => {
@@ -505,18 +519,7 @@ export default function PreTournamentPage() {
           🏁 Avvia torneo
         </Button>
 
-        <Button
-          variant="destructive"
-          onClick={() => {
-            const ok = window.confirm("Vuoi davvero cancellare questo torneo?");
-            if (!ok) return;
-            axios.delete(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`).then(() => {
-              navigate("/");
-            });
-          }}
-        >
-          ❌ Cancella torneo
-        </Button>
+        
       </div>
     </div>
   );

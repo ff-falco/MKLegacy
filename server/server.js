@@ -234,6 +234,49 @@ app.post("/api/tournament/:code/temporary-results", async (req, res) => {
   }
 });
 
+app.post("/api/tournament/:code/temporary-maps", async (req, res) => {
+  const { code } = req.params;
+  const { temporaryMaps } = req.body;
+
+  console.log("📥 Ricevuto dal client (maps):", temporaryMaps); // 👈 Log importante
+  try {
+    const tournament = await Tournament.findOne({ code });
+    if (!tournament) return res.status(404).send("Torneo non trovato");
+    tournament.temporaryMaps = temporaryMaps;
+    tournament.markModified("temporaryMaps");
+    await tournament.save();
+
+    console.log("💾 Mappe temporanee salvate su DB:", tournament.temporaryMaps); // 👈 Log dopo il salvatagg
+    res.status(200).json({
+      message: "Mappe temporanee aggiornate",
+      temporaryMaps: tournament.temporaryMaps,
+    });
+  } catch (err) {
+    console.error("❌ Errore durante il salvataggio delle mappe:", err);
+    res.status(500).send("Errore interno");
+  }
+});
+
+app.patch("/api/tournament/:code/temporary-map-name", async (req, res) => {
+  const { code } = req.params;
+  const { selectedMap } = req.body;
+  try {
+    console.log("📥 Ricevuto dal client (map index):", selectedMap); // 👈 Log importante
+    const tournament = await Tournament.findOne({ code });
+    if (!tournament) return res.status(404).send("Torneo non trovato");
+    tournament.selectedMap = selectedMap;
+    await tournament.save();
+    res.status(200).json({
+      message: "Indice mappa temporanea aggiornato",
+      currentMapIndex: tournament.currentMapIndex,
+    });
+  } catch (err) {
+    console.error("❌ Errore durante l'aggiornamento dell'indice mappa:", err);
+    res.status(500).send("Errore interno");
+  }
+});
+
+
 // Implementazione rewind (DA FINIRE)
 app.post("/api/tournament/:code/rewind", async (req, res) => {
   const { code } = req.params;
@@ -274,6 +317,9 @@ app.post("/api/tournament/:code/rewind", async (req, res) => {
 
   
     tournament.temporaryResults = newtemporaryResults;
+
+    tournament.temporaryMaps = tournament.possibleMaps.pop();
+    tournament.selectedMap = tournament.chosenMaps.pop();
     await tournament.save();
 
     res.status(200).json({
@@ -338,6 +384,12 @@ app.post("/api/tournament/:code/qualify", async (req, res) => {
     tournament.temporaryResults = [];
     tournament.race = race + 1;
     console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
+
+    tournament.chosenMaps.push(tournament.selectedMap);
+    tournament.possibleMaps.push(tournament.temporaryMaps);
+    tournament.temporaryMaps = [];
+    tournament.selectedMap = "";
+
     await tournament.save();
 
     res.status(200).json({
@@ -456,6 +508,13 @@ app.post("/api/tournament/:code/next-race", async (req, res) => {
 
     tournament.temporaryResults = [];
     tournament.race = race + 1;
+
+    tournament.chosenMaps.push(tournament.selectedMap);
+    tournament.possibleMaps.push(tournament.temporaryMaps);
+
+    tournament.temporaryMaps = [];
+    tournament.selectedMap = "";
+
     console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
     await tournament.save();
 
@@ -586,6 +645,13 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
     tournament.temporaryResults = [];
     tournament.race = race + 1;
     console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
+
+    tournament.chosenMaps.push(tournament.selectedMap);
+    tournament.possibleMaps.push(tournament.temporaryMaps);
+
+    tournament.temporaryMaps = [];
+    tournament.selectedMap = "";
+
     await tournament.save();
 
     res.status(200).json({
@@ -661,6 +727,14 @@ app.post("/api/tournament/:code/finale", async (req, res) => {
     tournament.temporaryResults = [];
     tournament.race = race + 1;
     console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
+    tournament.chosenMaps.push(tournament.selectedMap);
+    tournament.possibleMaps.push(tournament.temporaryMaps);
+
+    tournament.temporaryMaps = [];
+    tournament.selectedMap = "";
+
+
+
     await tournament.save();
 
     res.status(200).json({

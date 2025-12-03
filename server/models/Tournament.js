@@ -11,6 +11,7 @@ const ResultSchema = new mongoose.Schema({
   points: Number,
   manual: {type: Boolean, default : false },
   startingposition: Number,
+  mapName: String,
 });
 
 const TemporaryResultSchema = new mongoose.Schema({
@@ -71,6 +72,9 @@ const TournamentSchema = new mongoose.Schema({
   ],
   tierCode: { type: String, default: "" },
   temporaryMaps: { type: [String], default: [] },
+  selectedMap: { type: String, default: "" },
+  chosenMaps: { type: [String], default: [] },
+  possibleMaps: { type: [[String]], default: [[]] },
 });
 
 export default mongoose.model("Tournament", TournamentSchema);
