@@ -287,7 +287,7 @@ export default function TournamentPage() {
                 value={newParticipant.name}
                 onChange={(e) => setNewParticipant({ ...newParticipant, name: e.target.value })}
                 // --- 🚨 5. FIX: RIMOSSO text-white (BUG) 🚨 ---
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-white text-black border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="text"
@@ -295,7 +295,7 @@ export default function TournamentPage() {
                 value={newParticipant.nickname}
                 onChange={(e) => setNewParticipant({ ...newParticipant, nickname: e.target.value })}
                 // --- 🚨 5. FIX: RIMOSSO text-white (BUG) 🚨 ---
-                className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border bg-white text-black px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <div className="flex gap-4 mt-4">
                 <Button variant="default" onClick={handleAddParticipant} className="flex-1">✅ Aggiungi</Button>
