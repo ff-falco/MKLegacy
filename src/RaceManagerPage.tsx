@@ -1031,8 +1031,20 @@ export default function RaceManagerPage() {
           {/* ⭐ FINE BLOCCO DI SELEZIONE MAPPA ⭐ */}
 
           <div className="grid gap-6 w-full max-w-5xl" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))" }}>
-            {groups.map((group, i) => {
-              const prevGroupSaved = i === 0 || savedGroups.includes(i - 1);
+            {(tournament.race === tournament.maxraces 
+                ? groups.map((g, i) => ({ group: g, i })).reverse() 
+                : groups.map((g, i) => ({ group: g, i }))
+            ).map(({ group, i }) => {
+              
+              const isFinale = tournament.race === tournament.maxraces;
+              
+              // LOGICA DI SBLOCCO INVERTITA:
+              // - Standard: la serie si sblocca se è la prima (i === 0) o se la precedente (i - 1) è salvata
+              // - Finale: la serie si sblocca se è l'ultima (i === groups.length - 1) o se la successiva in classifica (i + 1) è salvata
+              const prevGroupSaved = isFinale 
+                ? (i === groups.length - 1 || savedGroups.includes(i + 1))
+                : (i === 0 || savedGroups.includes(i - 1));
+
               const isEditable = editableGroups.includes(i);
               const locked = savedGroups.includes(i) && !isEditable;
 

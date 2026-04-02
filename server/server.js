@@ -594,7 +594,7 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
       const assignedSerie = Math.floor(index / tournament.stations) + 1;
       
       // La posizione all'interno della serie (da 1 a stations)
-      const assignedPosition = (index % tournament.stations) + 1;
+      const assignedPosition = tournament.stations - ((index % tournament.stations));
 
       // Aggiorna il partecipante originale nel database
       const originalP = participants.find(orig => orig.nickname === p.nickname);
