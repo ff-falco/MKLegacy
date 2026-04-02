@@ -146,28 +146,57 @@ export default function TournamentPage() {
   const handleAddMockParticipants = async () => {
     if (!tournament) return;
 
-    const remainingSlots = Number(tournament.totalPlayers) - participants.length;
+    const totalPlayers = Number(tournament.totalPlayers);
+    const remainingSlots = totalPlayers - participants.length;
+    
     if (remainingSlots <= 0) {
       await showModalMessage("Il torneo è già pieno!");
       return;
     }
 
+    // 1. Trova tutti i seeding già in uso dai partecipanti attuali
+    const usedSeedings = new Set(
+      participants
+        .filter((p) => p.seeding != null)
+        .map((p) => p.seeding)
+    );
+
+    // 2. Crea un array con tutti i seeding ancora disponibili (da 1 a totalPlayers)
+    const availableSeedings = Array.from({ length: totalPlayers }, (_, i) => i + 1)
+      .filter((s) => !usedSeedings.has(s));
+
+    // 3. Mescola l'array dei seeding disponibili casualmente (algoritmo di Fisher-Yates)
+    for (let i = availableSeedings.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [availableSeedings[i], availableSeedings[j]] = [availableSeedings[j], availableSeedings[i]];
+    }
+
+    // 4. Assegna un seeding casuale univoco a ciascun partecipante mock
     const mockParticipants = Array.from({ length: remainingSlots }, (_, i) => ({
       name: `Giocatore ${participants.length + i + 1}`,
       nickname: `nick${participants.length + i + 1}`,
-      seeding: null, // Lasciamo che il seeding venga impostato dopo
+      seeding: availableSeedings[i], // Prendiamo uno dei seeding casuali disponibili
     }));
 
     try {
       // Aggiungiamo in sequenza tutti i giocatori mock
       for (const p of mockParticipants) {
         await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/join`, p);
+        
+        // --- IMPORTANTE: Se il tuo endpoint /join NON salva automaticamente il seeding ---
+        // (Dipende da come è fatto il backend), potresti dover fare una chiamata aggiuntiva per il seed
+        if (p.seeding !== undefined) {
+           await axios.post(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}/seed`, {
+             nickname: p.nickname,
+             seeding: p.seeding
+           });
+        }
       }
 
       // Poi aggiorniamo i partecipanti dal server
       const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/tournament/${tournament.code}`);
       setParticipants(res.data.participants ?? []);
-      await showModalMessage("Giocatori mock aggiunti con successo!");
+      await showModalMessage("Giocatori mock aggiunti con successo con seeding casuale!");
     } catch (err) {
       console.error(err);
     }
