@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,12 @@ interface Participant {
 export default function TournamentPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { code, fromCreate } = location.state as { code?: string; fromCreate?: boolean };
+  const { code } = useParams<{ code: string }>();
+  
+  // Evitiamo il crash se location.state è null (es. quando vieni da Riprendi Torneo)
+  const state = location.state as { fromCreate?: boolean } | null;
+  const fromCreate = state?.fromCreate;
+
 
   const [tournament, setTournament] = useState<any>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -44,23 +49,30 @@ export default function TournamentPage() {
 
 
   useEffect(() => {
-    if (fromCreate) {
-      const stored = localStorage.getItem("tournamentData");
-      if (stored) {
-        const t = JSON.parse(stored);
+    if (!code) return; // Assicuriamoci che il codice esista
+
+    // Chiediamo SEMPRE al backend lo stato aggiornato del torneo.
+    // Questo risolve i "partecipanti fantasma" dopo l'F5.
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
+      .then((res) => {
+        const t = res.data;
         setTournament(t);
         setParticipants(t.participants ?? []);
-      }
-    } else if (code) {
-      axios
-        .get(`${import.meta.env.VITE_API_URL}/api/tournament/${code}`)
-        .then((res) => {
-          const t = res.data;
-          setTournament(t);
-          setParticipants(t.participants ?? []);
-        })
-        .catch((err) => console.error(err));
-    }
+      })
+      .catch((err) => {
+        console.error("Errore di rete o torneo non trovato dal server", err);
+        // Usiamo il localStorage SOLO come ultima ancora di salvezza
+        // se siamo appena arrivati dalla creazione e il server è lento
+        if (fromCreate) {
+          const stored = localStorage.getItem("tournamentData");
+          if (stored) {
+            const t = JSON.parse(stored);
+            setTournament(t);
+            setParticipants(t.participants ?? []);
+          }
+        }
+      });
   }, [code, fromCreate]);
 
   if (!tournament) {
