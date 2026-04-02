@@ -539,112 +539,83 @@ app.post("/api/tournament/:code/next-race", async (req, res) => {
 
 
 // ➡️ Passa alla gara successiva FINALE TO DO
+// ➡️ Passa alla gara successiva FINALE PREPARATION
 app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
-  const { code, partecipants } = req.params;
+  const { code } = req.params;
 
   try {
     const tournament = await Tournament.findOne({ code });
     if (!tournament) return res.status(404).send("Torneo non trovato");
 
-    const { temporaryResults, participants, race , seriesIncrement, seriesThreshold} = tournament;
-    // Ordina i temporaryResults per posizione
-    temporaryResults.sort((a, b) => a.position - b.position);
+    const { temporaryResults, participants, race } = tournament;
 
-    // Metti in temporaryPositions le nextserie
-    const avaiablepositions=[];
-    for (let i = 0; i <= tournament.seriesCount; i++) 
-      avaiablepositions.push(tournament.stations);
-
-    for (let i = 0; i < temporaryResults.length; i++) {
-      // Ritorna il primo indice di avaiablepositions che è maggiore o uguale a i+1
-      const nextserie = avaiablepositions.findIndex(pos => pos > 0);
-      temporaryResults[i].nextserie = nextserie + 1; // +1 perché le serie partono da 1
-      temporaryResults[i].nextposition = avaiablepositions[nextserie] ; // Assegna la posizione disponibile (all'inizio sono casuali)
-      avaiablepositions[nextserie]--;
-    }
-
-    
-
+    // 1. Assegna i punti e salva il risultato della gara corrente (semi-finale)
     temporaryResults.forEach(tr => {
       const p = participants.find(pp => pp.nickname === tr.nickname);
-      console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
-      // Calcolo nuova serie in base alla posizione
-      let newserie;
-      if(tr.position<=seriesThreshold && p.nextserie>1) //promozione
-        newserie=p.nextserie-1;
-      else if(tr.position>(tournament.stations-seriesThreshold) && p.nextserie<tournament.seriesCount) //retrocessione
-        newserie=p.nextserie+1;
-      else
-        newserie=p.nextserie;
-
-      //Calcolo nuova posizione
-      let newposition;
-    
-      
-      if (seriesThreshold>0) { // se c'è un incremento di serie
-        if (p.nextserie==tournament.seriesCount-1 && newserie==tournament.seriesCount){// sei retrocesso nell'ultima serie (Momentum negativo)
-          newposition=tr.position;
-          }
-
-        else if(p.nextserie==2 && newserie==1){ // sei promosso nella prima serie (Momentum positivo)
-          newposition=tr.position;
-        }
-        else{
-          newposition=tournament.stations - tr.position +1;
-          }
-      } else { // se non c'è incremento di serie
-        newposition=tournament.stations - tr.position +1;
-        ;
-      }
       if (p) {
-        const p = participants.find(pp => pp.nickname === tr.nickname);
-        console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
-
-
-        // Calcolo nuova serie in base alla posizione(se sei nei primi 50% vai nella serie 1, altrimenti serie 2)
-        let newserie= Math.floor(temporaryResults.indexOf(tr)/tournament.stations) +1;
-        let modulo=(temporaryResults.indexOf(tr))%tournament.stations;
-        let newposition=tournament.stations - modulo;
-
-
         let pointsearned = 0;
-
-        // Controlla se il risultato è manuale (come inviato dal frontend)
-        // tr.isManualScore === true && tr.manualScore !== null
-        // (Controlliamo anche 'tr.beer' per retrocompatibilità, sebbene il front-end usi 'isManualScore')
+        
+        // Calcolo punteggio
         if ((tr.manual === true && tr.manualScore !== null)) {
-          // Usa il punteggio manuale
-          // Diamo priorità ai nuovi campi 'manualScore', fallback sui vecchi 'points'
           pointsearned = tr.manualScore ?? 0;
           console.log(`Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
         } else {
-          // Altrimenti, usa la formula basata sulla posizione
-          pointsearned = (tournament.stations - (tr.position) + 1) + (tournament.seriesCount - tr.serie) * tournament.seriesIncrement;
+          pointsearned = (tournament.stations - tr.position + 1) + (tournament.seriesCount - tr.serie) * tournament.seriesIncrement;
           console.log(`Punteggio automatico per ${p.nickname}: ${pointsearned}`);
         }
+
         const result = {
           serie: tr.serie,
           station: tr.position,
           position: tr.position,
-          nextposition: newposition,
-          nextserie: newserie,
+          // nextposition e nextserie verranno aggiornati nel prossimo step
           points: pointsearned,
           manual: tr.manual,
           startingposition: tr.startingposition,
         };
-        console.log("Risultato qualifiche per partecipante:", p.nickname, result);
 
-        p.nextserie = newserie;
-        p.nextposition = newposition;
         p.results.push(result);
-        p.points += pointsearned;
+        p.points += pointsearned; // Aggiorna i punti totali nel torneo
       }
-      console.log("Nuova serie e posizione per partecipante:", p.nickname, "Nuova serie:", p.nextserie, "Nuova posizione:", p.nextposition);
     });
 
+    // 2. Ordina i partecipanti in base ai punti TOTALI aggiornati (decrescente).
+    // In caso di parità, usiamo il seeding (crescente) come spareggio.
+    const sortedParticipants = [...participants].sort((a, b) => {
+      if ((b.points ?? 0) !== (a.points ?? 0)) {
+        return (b.points ?? 0) - (a.points ?? 0);
+      }
+      return (a.seeding ?? 9999) - (b.seeding ?? 9999);
+    });
+
+    // 3. Assegna nextserie e nextposition in base alla classifica generale
+    sortedParticipants.forEach((p, index) => {
+      // La serie è determinata in blocchi di grandezza "stations" (es. i primi 4 in serie 1, dal 5 all'8 in serie 2...)
+      const assignedSerie = Math.floor(index / tournament.stations) + 1;
+      
+      // La posizione all'interno della serie (da 1 a stations)
+      const assignedPosition = (index % tournament.stations) + 1;
+
+      // Aggiorna il partecipante originale nel database
+      const originalP = participants.find(orig => orig.nickname === p.nickname);
+      if (originalP) {
+        originalP.nextserie = assignedSerie;
+        originalP.nextposition = assignedPosition;
+
+        // Aggiorna anche l'ultimo risultato inserito nello storico per mantenerlo coerente
+        const lastResult = originalP.results[originalP.results.length - 1];
+        if (lastResult) {
+          lastResult.nextserie = assignedSerie;
+          lastResult.nextposition = assignedPosition;
+        }
+        
+        console.log(`[Finale Prep] ${originalP.nickname} | Punti: ${originalP.points} | Va in Serie: ${assignedSerie} Pos: ${assignedPosition}`);
+      }
+    });
+
+    // 4. Reset variabili temporanee e avanzamento gara
     tournament.temporaryResults = [];
     tournament.race = race + 1;
-    console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
 
     tournament.chosenMaps.push(tournament.selectedMap);
     tournament.possibleMaps.push(tournament.temporaryMaps);
@@ -655,7 +626,7 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
     await tournament.save();
 
     res.status(200).json({
-      message: "Prossima gara avviata, risultati salvati",
+      message: "Preparazione Finale completata, giocatori assegnati per punteggio",
       race: tournament.race,
     });
   } catch (err) {
@@ -668,81 +639,82 @@ app.post("/api/tournament/:code/finale-preparation", async (req, res) => {
 
 
 
+// ➡️ Passa alla gara successiva FINALE (Termina Torneo)
 app.post("/api/tournament/:code/finale", async (req, res) => {
-  const { code, partecipants } = req.params;
+  const { code } = req.params; // Ho rimosso 'partecipants' da qui perché non lo stavi usando nei params
 
   try {
     const tournament = await Tournament.findOne({ code });
     if (!tournament) return res.status(404).send("Torneo non trovato");
 
-    const { temporaryResults, participants, race , seriesIncrement, seriesThreshold} = tournament;
-    // Ordina i temporaryResults per posizione
-    temporaryResults.sort((a, b) => a.position - b.position);
+    const { temporaryResults, participants, race } = tournament;
 
+    // Assegna i punti finali a tutti in base alla loro posizione
     temporaryResults.forEach(tr => {
       const p = participants.find(pp => pp.nickname === tr.nickname);
+      
       if (p) {
-        const p = participants.find(pp => pp.nickname === tr.nickname);
-        console.log("Calcolo nuova serie per partecipante:", p.nickname, "Serie attuale:", p.nextserie, "Posizione attuale:", tr.position);
-
-
-        // Calcolo nuova serie in base alla posizione(se sei nei primi 50% vai nella serie 1, altrimenti serie 2)
-        let newserie= Math.floor(temporaryResults.indexOf(tr)/tournament.stations) +1;
-        let modulo=(temporaryResults.indexOf(tr))%tournament.stations;
-        let newposition=tournament.stations - modulo;
-
-
-        
         let pointsearned = 0;
-        if ((tr.manual === true && tr.manualScore !== null)) {
-          // Usa il punteggio manuale
-          // Diamo priorità ai nuovi campi 'manualScore', fallback sui vecchi 'points'
+
+        if (tr.manual === true && tr.manualScore !== null) {
+          // Punteggio manuale
           pointsearned = tr.manualScore ?? 0;
-          console.log(`Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
+          console.log(`[Finale] Punteggio MANUALE per ${p.nickname}: ${pointsearned}`);
         } else {
-          // Altrimenti, usa la formula basata sulla posizione
-          pointsearned = (tournament.stations - (tr.position)+1) * tournament.finaleincrement[tr.serie -1];
-          console.log(`Punteggio automatico per ${p.nickname}: ${pointsearned}`);
+          // Punteggio calcolato (con fallback di sicurezza se finaleincrement non esiste)
+          // Moltiplicatore: es. i primi in Serie 1 prendono più punti rispetto ai primi in Serie 2
+          const increment = tournament.finaleincrement?.[tr.serie - 1] || 1; 
+          pointsearned = (tournament.stations - tr.position + 1) * increment;
+          console.log(`[Finale] Punteggio automatico per ${p.nickname}: ${pointsearned} (Moltiplicatore Serie ${tr.serie}: x${increment})`);
         }
 
         const result = {
           serie: tr.serie,
           station: tr.position,
           position: tr.position,
-          nextposition: newposition,
-          nextserie: newserie,
+          nextposition: 0, // Essendo la finale, non c'è una prossima gara
+          nextserie: 0,    // Essendo la finale, non c'è una prossima gara
           points: pointsearned,
           manual: tr.manual,
           startingposition: tr.startingposition,
         };
         
+        // Azzera la griglia futura e aggiorna lo storico e i punti totali
         p.nextserie = 0;
         p.nextposition = 0;
         p.results.push(result);
         p.points += pointsearned;
+
+        console.log(`[Finale] ${p.nickname} termina il torneo con Punti Totali: ${p.points}`);
       }
-      console.log("Nuova serie e posizione per partecipante:", p.nickname, "Nuova serie:", p.nextserie, "Nuova posizione:", p.nextposition);
+    });
+
+    // Opzionale ma consigliato: Ordiniamo in modo definitivo l'array dei partecipanti
+    // in modo che nel database restino salvati già in ordine di classifica finale
+    participants.sort((a, b) => {
+        if ((b.points ?? 0) !== (a.points ?? 0)) {
+            return (b.points ?? 0) - (a.points ?? 0);
+        }
+        return (a.seeding ?? 9999) - (b.seeding ?? 9999);
     });
 
     tournament.temporaryResults = [];
-    tournament.race = race + 1;
-    console.log("Posizioni prese dopo le qualifiche:", tournament.stationsPositions);
+    tournament.race = race + 1; // Questo porterà race a superare maxraces, indicando al frontend che è finito
+
     tournament.chosenMaps.push(tournament.selectedMap);
     tournament.possibleMaps.push(tournament.temporaryMaps);
 
     tournament.temporaryMaps = [];
     tournament.selectedMap = "";
 
-
-
     await tournament.save();
 
     res.status(200).json({
-      message: "Prossima gara avviata, risultati salvati",
+      message: "Torneo concluso e classifica finale salvata con successo",
       race: tournament.race,
     });
   } catch (err) {
-    console.error(err);
+    console.error("Errore nel calcolo della Finale:", err);
     res.status(500).send("Errore interno");
   }
 });
