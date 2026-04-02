@@ -142,22 +142,17 @@ const fetchGitHubImages = async (): Promise<MapImageItem[]> => {
   const createGroups = (participants: any[], stations: number) => {
     if (!participants.length) return [];
 
-    // Ordina tutti i partecipanti per seeding
     const ordered = [...participants].sort((a, b) => (a.seeding ?? 9999) - (b.seeding ?? 9999));
 
     const totalGroups = Math.ceil(ordered.length / stations);
-    
-    // --- 🚨 FIX: DISTRIBUZIONE ROUND-ROBIN 🚨 ---
-    // Creiamo un array contenente 'totalGroups' array vuoti
-    const tempGroups: any[][] = Array.from({ length: totalGroups }, () => []);
+    const groups: any[][] = [];
 
-    // Distribuiamo i giocatori uno per volta nei gruppi (il 1° in A, 2° in B, ecc.)
-    // L'operatore modulo (%) fa ricominciare il giro quando si raggiunge l'ultimo gruppo
-    ordered.forEach((p, index) => {
-      tempGroups[index % totalGroups].push(p);
-    });
-
-    return tempGroups;
+    for (let i = 0; i < totalGroups; i++) {
+      const start = i * stations;
+      const end = start + stations;
+      groups.push(ordered.slice(start, end));
+    }
+    return groups;
   };
 
   const calcolapunteggi = (index: number, column:number, incremento:number, maxpartecipants:number, seriescount:number) => {
