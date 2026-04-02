@@ -572,8 +572,41 @@ export default function RaceManagerPage() {
         let completedGroups: number[] = [];
         
         // Logica di distribuzione (omessa per brevità, ma presente)
-        if(t.race === 1){ // Ordinamento per qualifiche
+        // --- INIZIO LOGICA DI DISTRIBUZIONE ---
+        if (t.race === 1) { 
+            // 1. QUALIFICHE (Round-Robin in base al seeding)
             const ordered = [...t.participants].sort((a, b) => (a.seeding ?? 9999) - (b.seeding ?? 9999));
+            const totalGroups = Math.ceil(ordered.length / t.stations);
+            const tempGroups: any[][] = Array.from({ length: totalGroups }, () => []);
+            
+            ordered.forEach((p, index) => {
+                tempGroups[index % totalGroups].push(p);
+            });
+
+            for (let i = 0; i < totalGroups; i++) {
+                const group: Group = tempGroups[i].map((p) => {
+                    const tr = t.temporaryResults.find((r: any) => r.nickname === p.nickname && r.serie === i + 1);
+                    return {
+                        ...p,
+                        currentPosition: tr?.position ?? "",
+                        isManualScore: tr?.manual ?? tr?.beer ?? false, 
+                        manualScore: tr?.manualScore ?? tr?.points ?? null, 
+                    } as Participant;
+                });
+                
+                const groupCompleted = group.length > 0 && group.every((p) => p.currentPosition !== "");
+                if (groupCompleted) completedGroups.push(i);
+                distribuiti.push(group);
+            }
+        
+        } else if (t.race === t.maxraces) {
+            // 2. FINALE (Ordinamento per punti globali)
+            const ordered = [...t.participants].sort((a, b) => {
+                if ((b.points ?? 0) !== (a.points ?? 0)) {
+                    return (b.points ?? 0) - (a.points ?? 0);
+                }
+                return (a.seeding ?? 9999) - (b.seeding ?? 9999);
+            });
             const totalGroups = Math.ceil(ordered.length / t.stations);
             
             for (let i = 0; i < totalGroups; i++) {
@@ -590,36 +623,38 @@ export default function RaceManagerPage() {
                     } as Participant;
                 });
                 
-                const groupCompleted = group.every((p) => p.currentPosition !== "");
+                const groupCompleted = group.length > 0 && group.every((p) => p.currentPosition !== "");
                 if (groupCompleted) completedGroups.push(i);
                 distribuiti.push(group);
             }
-        
-        } else if(t.race > 1) { // Ordinamento per gare interne
+
+        } else if (t.race > 1) { 
+            // 3. GARE INTERNE (Ordinamento sicuro per nextserie e nextposition)
             const maxSerie = Math.max(...t.participants.map((p: any) => p.nextserie || 1));
             
             for (let i = 1; i <= maxSerie; i++) {
                 const groupParticipants = t.participants.filter((p: any) => p.nextserie === i);
-                const group: Group = [];
-
-                for (let j = 1; j <= t.stationsPositions.length; j++) {
-                    let positionValue = t.stationsPositions[j-1];
-                    const p = groupParticipants.find((gp: any) => gp.nextposition === positionValue);
-                    if (p) {
+                
+                // 🚨 FIX CRITICO: Ordinamento diretto tramite nextposition, 
+                // ignorando l'array "stationsPositions" per evitare bug di giocatori mancanti!
+                const group: Group = groupParticipants
+                    .sort((a, b) => (a.nextposition ?? 99) - (b.nextposition ?? 99))
+                    .map((p) => {
                         const tr = t.temporaryResults.find((r: any) => r.nickname === p.nickname && r.serie === i);
-                        group.push({
+                        return {
                             ...p,
                             currentPosition: tr?.position ?? "",
                             isManualScore: tr?.manual ?? tr?.beer ?? false, 
                             manualScore: tr?.manualScore ?? tr?.points ?? null, 
-                        } as Participant);
-                    }
-                }
-                const groupCompleted = group.every((p) => p.currentPosition !== "");
+                        } as Participant;
+                    });
+
+                const groupCompleted = group.length > 0 && group.every((p) => p.currentPosition !== "");
                 if (groupCompleted) completedGroups.push(i - 1);
                 distribuiti.push(group);
             }
         }
+        // --- FINE LOGICA DI DISTRIBUZIONE ---
         
         setTournament({ ...t });
         setGroups(distribuiti);
@@ -787,26 +822,41 @@ export default function RaceManagerPage() {
 
     setGroups((prevGroups) => {
       const newGroups = [...prevGroups];
-      const nextGroup = newGroups[groupIndex + 1];
       
+      // Se siamo nella finale, non c'è bisogno di riordinare il gruppo successivo
+      if (tournament.race === tournament.maxraces) {
+          return newGroups;
+      }
+
+      const nextGroup = newGroups[groupIndex + 1];
       const arrivalPositions = updatedTournament.stationsPositions || [];
 
       if (!nextGroup || arrivalPositions.length === 0) return newGroups;
   
-      const reorderedGroup: (Participant | null)[] = Array(arrivalPositions.length).fill(null);
+      // --- 🚨 FIX CRITICO: Evita di perdere partecipanti ---
+      const placedParticipants = new Set<string>();
+      const reorderedGroup: Participant[] = [];
 
-      arrivalPositions.forEach((arrivalPosValue, index) => {
+      // 1. Prima piazza i giocatori che hanno un riscontro esatto con le posizioni d'arrivo
+      arrivalPositions.forEach((arrivalPosValue) => {
         const participantToMove = nextGroup.find(p => p.nextposition === arrivalPosValue);
         if (participantToMove) {
-          reorderedGroup[index] = participantToMove;
+          reorderedGroup.push(participantToMove);
+          placedParticipants.add(participantToMove.nickname);
+        }
+      });
+
+      // 2. Poi accoda TUTTI i giocatori rimanenti per evitare che scompaiano nel vuoto!
+      nextGroup.forEach((p) => {
+        if (!placedParticipants.has(p.nickname)) {
+          reorderedGroup.push(p);
         }
       });
   
-      newGroups[groupIndex + 1] = reorderedGroup.filter(p => p !== null) as Group;
+      newGroups[groupIndex + 1] = reorderedGroup as Group;
       
       return newGroups;
     });
-  };
 
   const handleRewind = async () => {
     if (!tournament) return;
