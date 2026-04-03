@@ -573,18 +573,11 @@ export default function RaceManagerPage() {
         
         // Logica di distribuzione (omessa per brevità, ma presente)
         if(t.race === 1){ // Ordinamento per qualifiche
-            // 1. Ordina tutti i giocatori dal seeding migliore al peggiore (1, 2, 3, 4, 5...)
-            const sortedBySeed = [...t.participants].sort((a, b) => (a.seeding ?? 9999) - (b.seeding ?? 9999));
-            const totalGroups = Math.ceil(sortedBySeed.length / t.stations);
+            const ordered = [...t.participants].sort((a, b) => (a.seeding ?? 9999) - (b.seeding ?? 9999));
+            
 
-            const ordered = [];
-            for (let i = 0; i < totalGroups; i++) {
-                for (let j = i; j < sortedBySeed.length; j += totalGroups) {
-                    ordered.push(sortedBySeed[j]);
-                }
-            }
-
-            // 2. Riorganizza l'array in modalità "Round Robin" (1°, 5°, 9°... poi 2°, 6°, 10°...)
+            const totalGroups = Math.ceil(ordered.length / t.stations);
+            
             for (let i = 0; i < totalGroups; i++) {
                 const start = i * t.stations;
                 const end = start + t.stations;
@@ -603,7 +596,7 @@ export default function RaceManagerPage() {
                 if (groupCompleted) completedGroups.push(i);
                 distribuiti.push(group);
             }
-
+        
         } else if (t.race === t.maxraces) { 
             // 🏆 FINALE: Stessa logica sicura, ma ciclo invertito (D -> C -> B -> A)
             const maxSerie = Math.max(...t.participants.map((p: any) => p.nextserie || 1));
@@ -633,7 +626,7 @@ export default function RaceManagerPage() {
                 distribuiti.push(group);
             }
 
-        } else if(t.race > 1 && t.race < t.maxraces) { // Ordinamento per gare interne
+        } else if(t.race > 1) { // Ordinamento per gare interne
             const maxSerie = Math.max(...t.participants.map((p: any) => p.nextserie || 1));
             
             for (let i = 1; i <= maxSerie; i++) {
@@ -657,8 +650,7 @@ export default function RaceManagerPage() {
                 if (groupCompleted) completedGroups.push(i - 1);
                 distribuiti.push(group);
             }
-        } 
-
+        }
         
         setTournament({ ...t });
         setGroups(distribuiti);
