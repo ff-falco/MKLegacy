@@ -597,36 +597,7 @@ export default function RaceManagerPage() {
                 distribuiti.push(group);
             }
         
-        } else if (t.race === t.maxraces) { 
-            // 🏆 FINALE: Stessa logica sicura, ma ciclo invertito (D -> C -> B -> A)
-            const maxSerie = Math.max(...t.participants.map((p: any) => p.nextserie || 1));
-            
-            // 🚨 Ciclo invertito: i parte da maxSerie e scende fino a 1
-            for (let i = maxSerie; i >= 1; i--) {
-                const groupParticipants = t.participants.filter((p: any) => p.nextserie === i);
-                const group: Group = [];
-
-                for (let j = 1; j <= t.stationsPositions.length; j++) {
-                    let positionValue = t.stationsPositions[j-1];
-                    const p = groupParticipants.find((gp: any) => gp.nextposition === positionValue);
-                    if (p) {
-                        const tr = t.temporaryResults.find((r: any) => r.nickname === p.nickname && r.serie === i);
-                        group.push({
-                            ...p,
-                            currentPosition: tr?.position ?? "",
-                            isManualScore: tr?.manual ?? tr?.beer ?? false, 
-                            manualScore: tr?.manualScore ?? tr?.points ?? null, 
-                        } as Participant);
-                    }
-                }
-                const groupCompleted = group.length > 0 && group.every((p) => p.currentPosition !== "");
-                
-                // Siccome inseriamo al contrario, l'indice effettivo nell'array sarà (maxSerie - i)
-                if (groupCompleted) completedGroups.push(maxSerie - i);
-                distribuiti.push(group);
-            }
-
-        } else if(t.race > 1) { // Ordinamento per gare interne
+        }  else if(t.race > 1) { // Ordinamento per gare interne
             const maxSerie = Math.max(...t.participants.map((p: any) => p.nextserie || 1));
             
             for (let i = 1; i <= maxSerie; i++) {
